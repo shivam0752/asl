@@ -1,0 +1,22 @@
+cat >> .gitignore << 'EOF'
+# Environment variables — never commit these
+.env
+.env.local
+.env*.local
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native builds
+android/
+ios/
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+*.log
+EOF

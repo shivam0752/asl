@@ -1,0 +1,177 @@
+# LevelUp App — Cursor Rules
+
+## Project Overview
+React Native mobile app using Expo Router + TypeScript + Supabase.
+Converts LinkedIn and Google Fit data into an RPG character system.
+Users get a character with 6 stats, a class, and a level that reflects their real life.
+
+## Tech Stack
+- Expo SDK 55 with Expo Router (file-based routing)
+- TypeScript strict mode
+- Supabase (auth, postgres database)
+- NativeWind v4 NOT USED — use StyleSheet.create only
+- React Query (TanStack v5) for data fetching
+- expo-secure-store for token storage
+
+## Folder Structure
+app/
+  (auth)/splash.tsx, signup.tsx, login.tsx
+  (onboarding)/connect-linkedin.tsx, connect-googlefit.tsx, 
+               manual-entry.tsx, generating.tsx, class-reveal.tsx
+  (tabs)/index.tsx, character.tsx, progress.tsx, profile.tsx
+  xp-log.tsx
+  _layout.tsx, index.tsx
+components/
+  ui/StatBar.tsx, XPBar.tsx, CharacterCard.tsx, ActivityCard.tsx
+  modals/StatDetailModal.tsx, LevelUpModal.tsx, 
+         ShareCardModal.tsx, FeedbackModal.tsx
+lib/supabase.ts
+utils/statAlgorithm.ts, classAssignment.ts, xpEngine.ts
+hooks/useAuth.ts, useCharacter.ts, useStats.ts
+types/index.ts
+constants/theme.ts, classes.ts
+
+## Design System — ALWAYS USE THESE VALUES
+Colors:
+  background: '#0D0D0D'
+  surface: '#1A1A1A'
+  gold: '#F5C542'
+  textPrimary: '#FFFFFF'
+  textSecondary: '#888888'
+  border: '#2A2A2A'
+  error: '#FF5E5E'
+  success: '#4ADE80'
+
+Stat colors:
+  STR: '#FF5E5E'
+  INT: '#5EA8FF'
+  WIS: '#A78BFA'
+  VIT: '#4ADE80'
+  CHA: '#F472B6'
+  AGI: '#FB923C'
+
+Fonts:
+  heading: 'Bangers_400Regular'
+  body: 'Inter_400Regular'
+  bodyBold: 'Inter_700Bold'
+
+Spacing: xs=4, sm=8, md=16, lg=24, xl=32, xxl=48
+Border radius: sm=6, md=10, lg=16, full=999
+
+Import colors/fonts/spacing like this:
+  import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme'
+  import { STAT_COLORS } from '../../constants/theme'
+
+## TypeScript Types (already defined in types/index.ts)
+- StatName: 'STR' | 'INT' | 'WIS' | 'VIT' | 'CHA' | 'AGI'
+- Tier: 'Basic' | 'Intermediate'
+- ClassArchetype: 'Grinder' | 'Ironclad' | 'Ascendant' | 'Tactician' | 'Drifter' | 'Sage'
+- EventType: 'career' | 'fitness'
+- EducationLevel: 'highschool' | 'bachelors' | 'masters' | 'phd'
+- Character: { id, userId, class, tier, level, totalXp, careerXp, fitnessXp, createdAt, updatedAt }
+- Stat: { id, characterId, statName, baseScore, activeScore, lastUpdated }
+- XPEvent: { id, userId, eventType, eventName, xpGained, statAffected, statDelta, createdAt }
+- ManualEntryData: { avgDailySteps, workoutDaysPerWeek, avgSleepHours, yearsExperience, educationLevel, industryCount, certCount, endorsedSkills, connections, recommendations, careerSwitches }
+
+## Supabase Tables
+- profiles (id, username, created_at)
+- characters (id, user_id, class, tier, level, total_xp, career_xp, fitness_xp, created_at, updated_at)
+- stats (id, character_id, stat_name, base_score, active_score, last_updated)
+- xp_events (id, user_id, event_type, event_name, xp_gained, stat_affected, stat_delta, created_at)
+- connected_accounts (id, user_id, provider, access_token, refresh_token, expires_at, created_at)
+- feedback (id, user_id, liked, confusing, would_use, created_at)
+
+## Stat Logic
+- Total stat = (base * 0.7) + (active * 0.3), capped at 100
+- Base only moves up (high watermark), never decreases
+- WIS and INT never decay
+- VIT, STR, AGI active score decays after 30 days inactivity
+
+## XP Logic
+- Level threshold = 1000 * (level ^ 1.5)
+- Career XP from LinkedIn events
+- Fitness XP from Google Fit / manual events
+- XP weights: promotion=500, certification=150, new_skill=30,
+  workout_session=50, streak_7day=200, steps_goal=20,
+  new_connection=15, career_switch=300
+
+## Class System
+6 archetypes with XP multipliers:
+- Grinder: primary WIS+INT (x1.5), secondary CHA+AGI (x1.2)
+- Ironclad: primary STR+VIT (x1.5), secondary AGI (x1.2)
+- Ascendant: all equal (x1.1), gets synergy bonus
+- Tactician: primary INT+CHA (x1.5), secondary WIS (x1.2)
+- Drifter: primary AGI (x1.5), secondary CHA+VIT (x1.2)
+- Sage: primary WIS+INT (x1.5), secondary VIT (x1.2)
+
+Class names lookup:
+- Grinder Basic="The Striver", Intermediate="The Relentless"
+- Ironclad Basic="The Enduring", Intermediate="The Unbroken"
+- Ascendant Basic="The Balanced", Intermediate="The Aligned"
+- Tactician Basic="The Shrewd", Intermediate="The Architect"
+- Drifter Basic="The Wanderer", Intermediate="The Untethered"
+- Sage Basic="The Knowing", Intermediate="The Deepened"
+
+## Code Rules — ALWAYS FOLLOW THESE
+1. Use StyleSheet.create for ALL styling — no inline styles except position/flex overrides
+2. Import types from ../../types or ../types depending on depth
+3. Import constants from ../../constants/theme
+4. All Supabase calls go through hooks in /hooks — never call supabase directly in screens
+5. All business logic stays in /utils — never in components or screens
+6. Always handle loading state with ActivityIndicator in gold color
+7. Always handle error state with red error text
+8. No hardcoded colors — always use COLORS.x
+9. No hardcoded font names — always use FONTS.x
+10. No any types — use proper TypeScript types
+11. Navigation uses useRouter from expo-router
+12. Auth state comes from useAuth hook
+13. Character data comes from useCharacter(user?.id) hook
+14. XP events come from useXPEvents(user?.id) hook
+
+## Aesthetic
+- Dark anime/manga style
+- Gold accents throughout
+- Bangers font for all headings, level numbers, class names, button text
+- Inter for all body text, labels, descriptions
+- Manga speed lines for decorative backgrounds (thin Views rotated)
+- Character card has gold border + gold glow shadow
+- Buttons: gold filled (primary), gold outline (secondary)
+- All screens dark background #0D0D0D
+
+## Files Already Complete — DO NOT REGENERATE
+- types/index.ts ✓
+- constants/theme.ts ✓
+- constants/classes.ts ✓
+- lib/supabase.ts ✓
+- utils/statAlgorithm.ts ✓
+- utils/classAssignment.ts ✓
+- utils/xpEngine.ts ✓
+- hooks/useAuth.ts ✓
+- hooks/useCharacter.ts ✓
+- hooks/useStats.ts ✓
+- app/_layout.tsx ✓
+- app/index.tsx ✓
+- app/(auth)/splash.tsx ✓
+- app/(auth)/signup.tsx ✓
+- app/(auth)/login.tsx ✓
+- app/(onboarding)/connect-linkedin.tsx ✓
+- app/(onboarding)/connect-googlefit.tsx ✓
+- app/(onboarding)/manual-entry.tsx ✓
+- app/(onboarding)/generating.tsx ✓
+- app/(onboarding)/class-reveal.tsx ✓
+
+## Files Still Needed
+- app/(tabs)/_layout.tsx
+- app/(tabs)/index.tsx (Home)
+- app/(tabs)/character.tsx
+- app/(tabs)/progress.tsx
+- app/(tabs)/profile.tsx
+- app/xp-log.tsx
+- components/ui/StatBar.tsx
+- components/ui/XPBar.tsx
+- components/ui/CharacterCard.tsx
+- components/ui/ActivityCard.tsx
+- components/modals/StatDetailModal.tsx
+- components/modals/LevelUpModal.tsx
+- components/modals/ShareCardModal.tsx
+- components/modals/FeedbackModal.tsx
