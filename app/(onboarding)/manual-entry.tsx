@@ -17,15 +17,15 @@ import { useCreateCharacter } from '../../hooks/useCharacter';
 import { calculateAllStats } from '../../utils/statAlgorithm';
 import { ManualEntryData, EducationLevel } from '../../types';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
+import { supabase } from '../../lib/supabase';
 
 const EDUCATION_OPTIONS: { label: string; value: EducationLevel }[] = [
   { label: 'High School', value: 'highschool' },
-  { label: "Bachelor's", value: 'bachelors' },
-  { label: "Master's", value: 'masters' },
-  { label: 'PhD', value: 'phd' },
+  { label: "Bachelor's",  value: 'bachelors'  },
+  { label: "Master's",    value: 'masters'    },
+  { label: 'PhD',         value: 'phd'        },
 ];
 
-// ── Moved OUTSIDE main component to prevent re-render issues ──
 function SelectButtons({
   options,
   value,
@@ -43,12 +43,10 @@ function SelectButtons({
           style={[styles.selectBtn, value === opt && styles.selectBtnActive]}
           onPress={() => onChange(opt)}
         >
-          <Text
-            style={[
-              styles.selectBtnText,
-              value === opt && styles.selectBtnTextActive,
-            ]}
-          >
+          <Text style={[
+            styles.selectBtnText,
+            value === opt && styles.selectBtnTextActive,
+          ]}>
             {opt}
           </Text>
         </TouchableOpacity>
@@ -58,29 +56,27 @@ function SelectButtons({
 }
 
 export default function ManualEntry() {
-  const router = useRouter();
-  const { user } = useAuth();
+  const router          = useRouter();
+  const { user }        = useAuth();
   const createCharacter = useCreateCharacter();
-
   const [localError, setLocalError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<ManualEntryData>({
-    avgDailySteps: 7000,
+    avgDailySteps:      7000,
     workoutDaysPerWeek: 3,
-    avgSleepHours: 7,
-    yearsExperience: 2,
-    educationLevel: 'bachelors',
-    industryCount: 1,
-    certCount: 0,
-    endorsedSkills: 10,
-    connections: 200,
-    recommendations: 2,
-    careerSwitches: 0,
+    avgSleepHours:      7,
+    yearsExperience:    2,
+    educationLevel:     'bachelors',
+    industryCount:      1,
+    certCount:          0,
+    endorsedSkills:     10,
+    connections:        200,
+    recommendations:    2,
+    careerSwitches:     0,
   });
 
   async function handleSubmit() {
     setLocalError(null);
-
     if (!user) {
       setLocalError('You are not logged in. Please sign in first.');
       return;
@@ -88,10 +84,36 @@ export default function ManualEntry() {
 
     try {
       const stats = calculateAllStats(formData);
+      console.log('Calculated stats:', JSON.stringify(stats));
+
       await createCharacter.mutateAsync({
-        userId: user.id,
+        userId:    user.id,
         statsData: stats,
       });
+
+      // Save manual entry as base sync_data
+      // LinkedIn and Google Fit will enhance this later
+      await supabase.from('sync_data').upsert({
+        user_id: user.id,
+        linkedin_raw: {
+          yearsExperience:    formData.yearsExperience,
+          connectionsCount:   formData.connections,
+          certificateCount:   formData.certCount,
+          endorsedSkillCount: formData.endorsedSkills,
+          positionsCount:     Math.max(1, Math.floor(formData.yearsExperience / 2)),
+          seniorityLevel:     'entry',
+        },
+        googlefit_raw: {
+          avgDailySteps:   formData.avgDailySteps,
+          weeklyWorkouts:  formData.workoutDaysPerWeek,
+          avgSleepHours:   formData.avgSleepHours,
+          avgHeartRate:    70,
+          avgActiveMinutes: Math.round(formData.avgDailySteps / 200),
+        },
+        updated_at: new Date().toISOString(),
+      });
+
+      console.log('sync_data saved successfully');
       router.replace('/(onboarding)/generating');
     } catch (e: any) {
       console.log('Create character error:', e);
@@ -210,13 +232,11 @@ export default function ManualEntry() {
                     setFormData((p) => ({ ...p, educationLevel: opt.value }))
                   }
                 >
-                  <Text
-                    style={[
-                      styles.educationBtnText,
-                      formData.educationLevel === opt.value &&
-                        styles.educationBtnTextActive,
-                    ]}
-                  >
+                  <Text style={[
+                    styles.educationBtnText,
+                    formData.educationLevel === opt.value &&
+                      styles.educationBtnTextActive,
+                  ]}>
                     {opt.label}
                   </Text>
                 </TouchableOpacity>
@@ -228,7 +248,9 @@ export default function ManualEntry() {
           {(localError || createCharacter.isError) && (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>
-                {localError ?? createCharacter.error?.message ?? 'Something went wrong'}
+                {localError ??
+                  (createCharacter.error as any)?.message ??
+                  'Something went wrong'}
               </Text>
             </View>
           )}
@@ -247,7 +269,6 @@ export default function ManualEntry() {
               </Text>
             )}
           </TouchableOpacity>
-
         </ScrollView>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -256,124 +277,124 @@ export default function ManualEntry() {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flexGrow:          1,
     paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING.xl,
-    paddingBottom: 48,
+    paddingTop:        SPACING.xl,
+    paddingBottom:     48,
   },
   title: {
-    fontFamily: FONTS.heading,
-    fontSize: 32,
-    color: COLORS.textPrimary,
+    fontFamily:    FONTS.heading,
+    fontSize:      32,
+    color:         COLORS.textPrimary,
     letterSpacing: 1,
-    marginBottom: SPACING.xs,
+    marginBottom:  SPACING.xs,
   },
   subtitle: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontFamily:   FONTS.body,
+    fontSize:     14,
+    color:        COLORS.textSecondary,
     marginBottom: SPACING.xl,
   },
   field: {
     marginBottom: SPACING.lg,
   },
   label: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.sm,
+    fontFamily:    FONTS.bodyBold,
+    fontSize:      13,
+    color:         COLORS.textSecondary,
+    marginBottom:  SPACING.sm,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   input: {
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    height: 52,
+    borderRadius:    BORDER_RADIUS.md,
+    height:          52,
     paddingHorizontal: SPACING.md,
-    color: COLORS.textPrimary,
-    fontFamily: FONTS.body,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    color:           COLORS.textPrimary,
+    fontFamily:      FONTS.body,
+    fontSize:        16,
+    borderWidth:     1,
+    borderColor:     COLORS.border,
   },
   selectRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
+    flexWrap:      'wrap',
+    gap:           SPACING.sm,
   },
   selectBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.sm,
+    width:           44,
+    height:          44,
+    borderRadius:    BORDER_RADIUS.sm,
     backgroundColor: COLORS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1,
+    borderColor:     COLORS.border,
   },
   selectBtnActive: {
     backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
+    borderColor:     COLORS.gold,
   },
   selectBtnText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize:   14,
+    color:      COLORS.textSecondary,
   },
   selectBtnTextActive: {
     color: '#000000',
   },
   educationGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
+    flexWrap:      'wrap',
+    gap:           SPACING.sm,
   },
   educationBtn: {
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    paddingVertical:   SPACING.sm,
+    borderRadius:      BORDER_RADIUS.md,
+    backgroundColor:   COLORS.surface,
+    borderWidth:       1,
+    borderColor:       COLORS.border,
   },
   educationBtnActive: {
     backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
+    borderColor:     COLORS.gold,
   },
   educationBtnText: {
     fontFamily: FONTS.body,
-    fontSize: 14,
-    color: COLORS.textSecondary,
+    fontSize:   14,
+    color:      COLORS.textSecondary,
   },
   educationBtnTextActive: {
-    color: '#000000',
+    color:      '#000000',
     fontFamily: FONTS.bodyBold,
   },
   errorBox: {
     backgroundColor: '#2D1515',
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.error,
+    borderRadius:    BORDER_RADIUS.md,
+    padding:         SPACING.md,
+    marginBottom:    SPACING.md,
+    borderWidth:     1,
+    borderColor:     COLORS.error,
   },
   errorText: {
     fontFamily: FONTS.body,
-    color: COLORS.error,
-    fontSize: 13,
+    color:      COLORS.error,
+    fontSize:   13,
   },
   submitButton: {
     backgroundColor: COLORS.gold,
-    height: 56,
-    borderRadius: BORDER_RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.lg,
+    height:          56,
+    borderRadius:    BORDER_RADIUS.md,
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginTop:       SPACING.lg,
   },
   submitButtonText: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: '#000000',
+    fontFamily:    FONTS.heading,
+    fontSize:      20,
+    color:         '#000000',
     letterSpacing: 2,
   },
 });

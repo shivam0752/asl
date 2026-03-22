@@ -3,7 +3,7 @@
     "name": "LevelUp",
     "slug": "levelup",
     "version": "1.0.0",
-    "scheme": "levelup",
+    "scheme": "aetherls",
     "web": {
       "bundler": "metro"
     },
@@ -15,18 +15,19 @@
         {
           "faceIDPermission": "Allow LevelUp to access Face ID."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0D0D0D"
       },
-      "package": "com.yourname.levelup"
+      "package": "com.shivam.levelup"
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourname.levelup"
+      "bundleIdentifier": "com.shivam.levelup"
     }
   }
 }
