@@ -25,21 +25,20 @@ export default function ConnectLinkedIn() {
       const result = await connectLinkedIn();
 
       if (result.success) {
-        // Get the session to access the token
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
+        const accessToken = result.accessToken;
 
         if (accessToken && user) {
           // Fetch LinkedIn profile data
           const profile = await fetchLinkedInProfile(accessToken);
 
           // Store connected account
-          await supabase.from('connected_accounts').upsert({
+          const { error: accountError } = await supabase.from('connected_accounts').upsert({
             user_id:      user.id,
             provider:     'linkedin',
             access_token: accessToken,
             created_at:   new Date().toISOString(),
-          });
+          }, { onConflict: 'user_id,provider' });
+          if (accountError) throw accountError;
 
           // Store profile data for stat calculation later
           await supabase.from('profiles').upsert({

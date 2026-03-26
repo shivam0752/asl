@@ -1,16 +1,5 @@
 import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useCreateCharacter } from '../../hooks/useCharacter';
@@ -26,248 +15,72 @@ const EDUCATION_OPTIONS: { label: string; value: EducationLevel }[] = [
   { label: 'PhD',         value: 'phd'        },
 ];
 
-function SelectButtons({
-  options,
-  value,
-  onChange,
-}: {
-  options: number[];
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <View style={styles.selectRow}>
-      {options.map((opt) => (
-        <TouchableOpacity
-          key={opt}
-          style={[styles.selectBtn, value === opt && styles.selectBtnActive]}
-          onPress={() => onChange(opt)}
-        >
-          <Text style={[
-            styles.selectBtnText,
-            value === opt && styles.selectBtnTextActive,
-          ]}>
-            {opt}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
-  );
-}
-
 export default function ManualEntry() {
-  const router          = useRouter();
-  const { user }        = useAuth();
+  const router = useRouter();
+  const { user } = useAuth();
   const createCharacter = useCreateCharacter();
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<ManualEntryData>({
-    avgDailySteps:      7000,
+  const [formData, setFormData] = useState<ManualEntryData & { jobTitle: string }>({
+    avgDailySteps: 7000,
     workoutDaysPerWeek: 3,
-    avgSleepHours:      7,
-    yearsExperience:    2,
-    educationLevel:     'bachelors',
-    industryCount:      1,
-    certCount:          0,
-    endorsedSkills:     10,
-    connections:        200,
-    recommendations:    2,
-    careerSwitches:     0,
+    avgSleepHours: 7,
+    yearsExperience: 2,
+    educationLevel: 'bachelors',
+    industryCount: 1,
+    certCount: 0,
+    endorsedSkills: 10,
+    connections: 200,
+    recommendations: 2,
+    careerSwitches: 0,
+    jobTitle: '', 
   });
 
   async function handleSubmit() {
-    setLocalError(null);
-    if (!user) {
-      setLocalError('You are not logged in. Please sign in first.');
-      return;
-    }
-
+    if (!user) return;
     try {
       const stats = calculateAllStats(formData);
-      console.log('Calculated stats:', JSON.stringify(stats));
-
-      await createCharacter.mutateAsync({
-        userId:    user.id,
-        statsData: stats,
-      });
-
-      // Save manual entry as base sync_data
-      // LinkedIn and Google Fit will enhance this later
+      await createCharacter.mutateAsync({ userId: user.id, statsData: stats });
       await supabase.from('sync_data').upsert({
         user_id: user.id,
-        linkedin_raw: {
-          yearsExperience:    formData.yearsExperience,
-          connectionsCount:   formData.connections,
-          certificateCount:   formData.certCount,
-          endorsedSkillCount: formData.endorsedSkills,
-          positionsCount:     Math.max(1, Math.floor(formData.yearsExperience / 2)),
-          seniorityLevel:     'entry',
-        },
-        googlefit_raw: {
-          avgDailySteps:   formData.avgDailySteps,
-          weeklyWorkouts:  formData.workoutDaysPerWeek,
-          avgSleepHours:   formData.avgSleepHours,
-          avgHeartRate:    70,
-          avgActiveMinutes: Math.round(formData.avgDailySteps / 200),
-        },
+        linkedin_raw: { jobTitle: formData.jobTitle, yearsExperience: formData.yearsExperience, educationLevel: formData.educationLevel },
         updated_at: new Date().toISOString(),
       });
-
-      console.log('sync_data saved successfully');
       router.replace('/(onboarding)/generating');
     } catch (e: any) {
-      console.log('Create character error:', e);
-      setLocalError(e?.message ?? 'Something went wrong. Please try again.');
+      setLocalError(e?.message ?? 'Error saving data');
     }
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: COLORS.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: COLORS.background }} behavior="padding">
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView
-          contentContainerStyle={styles.container}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.title}>Tell us about yourself</Text>
-          <Text style={styles.subtitle}>
-            We'll build your character from this data
-          </Text>
-
-          {/* Daily Steps */}
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Boost Your Profile</Text>
+          
           <View style={styles.field}>
-            <Text style={styles.label}>Average daily steps</Text>
-            <TextInput
-              style={styles.input}
-              value={String(formData.avgDailySteps)}
-              onChangeText={(v) =>
-                setFormData((p) => ({ ...p, avgDailySteps: Number(v) || 0 }))
-              }
-              keyboardType="numeric"
-              placeholderTextColor={COLORS.textSecondary}
-            />
+            <Text style={styles.label}>Job Title</Text>
+            <TextInput style={styles.input} placeholder="e.g. Designer" placeholderTextColor="#666" value={formData.jobTitle} onChangeText={(v) => setFormData(p => ({ ...p, jobTitle: v }))} />
           </View>
 
-          {/* Workout days */}
           <View style={styles.field}>
-            <Text style={styles.label}>Workout days per week</Text>
-            <SelectButtons
-              options={[0, 1, 2, 3, 4, 5, 6, 7]}
-              value={formData.workoutDaysPerWeek}
-              onChange={(v) =>
-                setFormData((p) => ({ ...p, workoutDaysPerWeek: v }))
-              }
-            />
+            <Text style={styles.label}>Years of Experience</Text>
+            <TextInput style={styles.input} keyboardType="numeric" value={String(formData.yearsExperience)} onChangeText={(v) => setFormData(p => ({ ...p, yearsExperience: Number(v) || 0 }))} />
           </View>
 
-          {/* Sleep hours */}
           <View style={styles.field}>
-            <Text style={styles.label}>Average sleep hours</Text>
-            <SelectButtons
-              options={[5, 6, 7, 8, 9]}
-              value={formData.avgSleepHours}
-              onChange={(v) =>
-                setFormData((p) => ({ ...p, avgSleepHours: v }))
-              }
-            />
-          </View>
-
-          {/* Years experience */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Years of work experience</Text>
-            <TextInput
-              style={styles.input}
-              value={String(formData.yearsExperience)}
-              onChangeText={(v) =>
-                setFormData((p) => ({ ...p, yearsExperience: Number(v) || 0 }))
-              }
-              keyboardType="numeric"
-              placeholderTextColor={COLORS.textSecondary}
-            />
-          </View>
-
-          {/* Certifications */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Number of certifications</Text>
-            <TextInput
-              style={styles.input}
-              value={String(formData.certCount)}
-              onChangeText={(v) =>
-                setFormData((p) => ({ ...p, certCount: Number(v) || 0 }))
-              }
-              keyboardType="numeric"
-              placeholderTextColor={COLORS.textSecondary}
-            />
-          </View>
-
-          {/* Connections */}
-          <View style={styles.field}>
-            <Text style={styles.label}>LinkedIn connections (approx)</Text>
-            <TextInput
-              style={styles.input}
-              value={String(formData.connections)}
-              onChangeText={(v) =>
-                setFormData((p) => ({ ...p, connections: Number(v) || 0 }))
-              }
-              keyboardType="numeric"
-              placeholderTextColor={COLORS.textSecondary}
-            />
-          </View>
-
-          {/* Education */}
-          <View style={styles.field}>
-            <Text style={styles.label}>Highest education level</Text>
-            <View style={styles.educationGrid}>
+            <Text style={styles.label}>Education</Text>
+            <View style={styles.selectRow}>
               {EDUCATION_OPTIONS.map((opt) => (
-                <TouchableOpacity
-                  key={opt.value}
-                  style={[
-                    styles.educationBtn,
-                    formData.educationLevel === opt.value &&
-                      styles.educationBtnActive,
-                  ]}
-                  onPress={() =>
-                    setFormData((p) => ({ ...p, educationLevel: opt.value }))
-                  }
-                >
-                  <Text style={[
-                    styles.educationBtnText,
-                    formData.educationLevel === opt.value &&
-                      styles.educationBtnTextActive,
-                  ]}>
-                    {opt.label}
-                  </Text>
+                <TouchableOpacity key={opt.value} style={[styles.selectBtn, formData.educationLevel === opt.value && styles.activeBtn]} onPress={() => setFormData(p => ({ ...p, educationLevel: opt.value }))}>
+                  <Text style={{ color: formData.educationLevel === opt.value ? '#000' : '#fff' }}>{opt.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          {/* Errors */}
-          {(localError || createCharacter.isError) && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>
-                {localError ??
-                  (createCharacter.error as any)?.message ??
-                  'Something went wrong'}
-              </Text>
-            </View>
-          )}
-
-          {/* Submit */}
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={createCharacter.isPending}
-          >
-            {createCharacter.isPending ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.submitButtonText}>
-                BUILD MY CHARACTER →
-              </Text>
-            )}
+          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <Text style={styles.submitButtonText}>BUILD CHARACTER →</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -276,125 +89,14 @@ export default function ManualEntry() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow:          1,
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        SPACING.xl,
-    paddingBottom:     48,
-  },
-  title: {
-    fontFamily:    FONTS.heading,
-    fontSize:      32,
-    color:         COLORS.textPrimary,
-    letterSpacing: 1,
-    marginBottom:  SPACING.xs,
-  },
-  subtitle: {
-    fontFamily:   FONTS.body,
-    fontSize:     14,
-    color:        COLORS.textSecondary,
-    marginBottom: SPACING.xl,
-  },
-  field: {
-    marginBottom: SPACING.lg,
-  },
-  label: {
-    fontFamily:    FONTS.bodyBold,
-    fontSize:      13,
-    color:         COLORS.textSecondary,
-    marginBottom:  SPACING.sm,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.md,
-    height:          52,
-    paddingHorizontal: SPACING.md,
-    color:           COLORS.textPrimary,
-    fontFamily:      FONTS.body,
-    fontSize:        16,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-  },
-  selectRow: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           SPACING.sm,
-  },
-  selectBtn: {
-    width:           44,
-    height:          44,
-    borderRadius:    BORDER_RADIUS.sm,
-    backgroundColor: COLORS.surface,
-    alignItems:      'center',
-    justifyContent:  'center',
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-  },
-  selectBtnActive: {
-    backgroundColor: COLORS.gold,
-    borderColor:     COLORS.gold,
-  },
-  selectBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-  },
-  selectBtnTextActive: {
-    color: '#000000',
-  },
-  educationGrid: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           SPACING.sm,
-  },
-  educationBtn: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical:   SPACING.sm,
-    borderRadius:      BORDER_RADIUS.md,
-    backgroundColor:   COLORS.surface,
-    borderWidth:       1,
-    borderColor:       COLORS.border,
-  },
-  educationBtnActive: {
-    backgroundColor: COLORS.gold,
-    borderColor:     COLORS.gold,
-  },
-  educationBtnText: {
-    fontFamily: FONTS.body,
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-  },
-  educationBtnTextActive: {
-    color:      '#000000',
-    fontFamily: FONTS.bodyBold,
-  },
-  errorBox: {
-    backgroundColor: '#2D1515',
-    borderRadius:    BORDER_RADIUS.md,
-    padding:         SPACING.md,
-    marginBottom:    SPACING.md,
-    borderWidth:     1,
-    borderColor:     COLORS.error,
-  },
-  errorText: {
-    fontFamily: FONTS.body,
-    color:      COLORS.error,
-    fontSize:   13,
-  },
-  submitButton: {
-    backgroundColor: COLORS.gold,
-    height:          56,
-    borderRadius:    BORDER_RADIUS.md,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginTop:       SPACING.lg,
-  },
-  submitButtonText: {
-    fontFamily:    FONTS.heading,
-    fontSize:      20,
-    color:         '#000000',
-    letterSpacing: 2,
-  },
+  container: { padding: 20 },
+  title: { fontFamily: FONTS.heading, fontSize: 28, color: COLORS.gold, marginBottom: 20 },
+  field: { marginBottom: 20 },
+  label: { color: COLORS.textSecondary, marginBottom: 8, textTransform: 'uppercase', fontSize: 12 },
+  input: { backgroundColor: COLORS.surface, borderRadius: 8, height: 50, paddingHorizontal: 15, color: '#fff', borderWidth: 1, borderColor: COLORS.border },
+  selectRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  selectBtn: { padding: 10, borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  activeBtn: { backgroundColor: COLORS.gold },
+  submitButton: { backgroundColor: COLORS.gold, height: 55, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
+  submitButtonText: { fontFamily: FONTS.heading, fontSize: 18 }
 });

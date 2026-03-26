@@ -1,29 +1,69 @@
+// hooks/useAuth.ts
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Session, User } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
+
+type AuthSnapshot = {
+  user: User | null
+  session: Session | null
+  loading: boolean
+}
+
+type AuthListener = (snapshot: AuthSnapshot) => void
+
+let authSnapshot: AuthSnapshot = {
+  user: null,
+  session: null,
+  loading: true,
+}
+const authListeners = new Set<AuthListener>()
+let isAuthInitialized = false
+
+function notifyAuthListeners() {
+  authListeners.forEach((listener) => listener(authSnapshot))
+}
+
+function updateAuthSnapshot(session: Session | null) {
+  authSnapshot = {
+    user: session?.user ?? null,
+    session,
+    loading: false,
+  }
+  notifyAuthListeners()
+}
+
+async function initializeAuthIfNeeded() {
+  if (isAuthInitialized) return
+  isAuthInitialized = true
+
+  const { data } = await supabase.auth.getSession()
+  updateAuthSnapshot(data.session)
+
+  supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    updateAuthSnapshot(session)
+  })
+}
 
 export function useAuth() {
-  const [user, setUser]       = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser]       = useState<User | null>(authSnapshot.user)
+  const [session, setSession] = useState<Session | null>(authSnapshot.session)
+  const [loading, setLoading] = useState(authSnapshot.loading)
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    const listener: AuthListener = (snapshot) => {
+      setUser(snapshot.user)
+      setSession(snapshot.session)
+      setLoading(snapshot.loading)
+    }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        setLoading(false)
-      }
-    )
+    authListeners.add(listener)
+    listener(authSnapshot)
+    initializeAuthIfNeeded()
 
-    return () => subscription.unsubscribe()
+    return () => {
+      authListeners.delete(listener)
+    }
   }, [])
 
   const signUp = async (email: string, password: string): Promise<boolean> => {
@@ -46,10 +86,14 @@ export function useAuth() {
     return true
   }
 
-  const signOut = async (): Promise<void> => {
+  const signOut = async (): Promise<boolean> => {
     setError(null)
     const { error } = await supabase.auth.signOut()
-    if (error) setError(error.message)
+    if (error) {
+      setError(error.message)
+      return false
+    }
+    return true
   }
 
   const signInWithGoogle = async (): Promise<void> => {

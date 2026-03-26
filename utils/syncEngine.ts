@@ -124,12 +124,13 @@ export async function syncLinkedIn(userId: string): Promise<{
 
     await updateStatsInDB(character.id, newStats);
 
-    await supabase.from('sync_data').upsert({
+    const { error: syncDataError } = await supabase.from('sync_data').upsert({
       user_id:            userId,
       linkedin_raw:       linkedInMerged,
       last_linkedin_sync: new Date().toISOString(),
       updated_at:         new Date().toISOString(),
-    });
+    }, { onConflict: 'user_id' });
+    if (syncDataError) throw syncDataError;
 
     await supabase.from('xp_events').insert({
       user_id:       userId,
@@ -204,12 +205,13 @@ export async function syncGoogleFit(userId: string): Promise<{
 
     await updateStatsInDB(character.id, newStats);
 
-    await supabase.from('sync_data').upsert({
+    const { error: syncDataError } = await supabase.from('sync_data').upsert({
       user_id:             userId,
       googlefit_raw:       fitData,
       last_googlefit_sync: new Date().toISOString(),
       updated_at:          new Date().toISOString(),
-    });
+    }, { onConflict: 'user_id' });
+    if (syncDataError) throw syncDataError;
 
     await supabase.from('xp_events').insert({
       user_id:       userId,

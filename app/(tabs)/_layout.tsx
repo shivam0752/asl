@@ -1,6 +1,8 @@
-import { Tabs } from 'expo-router';
+import { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { COLORS, FONTS } from '../../constants/theme';
-import { Text } from 'react-native';
+import { Text, View, ActivityIndicator } from 'react-native';
+import { useAuth } from '../../hooks/useAuth'; // Import your auth hook
 
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return (
@@ -9,6 +11,26 @@ function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  const { session, loading } = useAuth();
+  const router = useRouter();
+
+  // AUTH GUARD: Monitor session changes
+  useEffect(() => {
+    if (!loading && !session) {
+      // The moment signOut() is called elsewhere, this triggers
+      router.replace('/(auth)/splash');
+    }
+  }, [session, loading]);
+
+  // Prevent flickering: Show a loader if the app is still checking the session
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center' }}>
+        <ActivityIndicator color={COLORS.gold} />
+      </View>
+    );
+  }
+
   return (
     <Tabs
       screenOptions={{

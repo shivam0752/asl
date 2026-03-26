@@ -28,20 +28,20 @@ export default function ConnectGoogleFit() {
       const result = await connectGoogleFit();
 
       if (result.success) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
+        const accessToken = result.accessToken;
 
         if (accessToken && user) {
           // Fetch real fitness data
           const fitData = await fetchGoogleFitData(accessToken);
 
           // Store connected account
-          await supabase.from('connected_accounts').upsert({
+          const { error: accountError } = await supabase.from('connected_accounts').upsert({
             user_id:      user.id,
             provider:     'googlefit',
             access_token: accessToken,
             created_at:   new Date().toISOString(),
-          });
+          }, { onConflict: 'user_id,provider' });
+          if (accountError) throw accountError;
 
           // Calculate stats from real data
           const stats = calculateAllStats({

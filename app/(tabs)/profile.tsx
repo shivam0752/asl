@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -58,75 +59,78 @@ export default function Profile() {
     checkConnections();
   }, [user]);
 
-  async function handleConnectLinkedIn() {
-    setLinkedInLoading(true);
-    try {
-      // Already connected — just resync, no OAuth
-      if (linkedInConnected) {
-        const result = await manualSyncLinkedIn();
-        if (result.success) {
-          refetch();
-          Alert.alert(
-            'LinkedIn Resynced! ✓',
-            `Stats updated. +${result.xpGained} XP earned.`,
-            [{
-              text: 'View Character',
-              onPress: () => router.push('/(tabs)/character'),
-            }]
-          );
-        } else {
-          // Token expired — force re-OAuth
-          setLinkedInConnected(false);
-          Alert.alert(
-            'Sync failed',
-            'Your LinkedIn session expired. Please reconnect.',
-          );
-        }
-        return;
-      }
+// app/(tabs)/profile.tsx (Partial - modifying the handlers)
 
-      // First time — do OAuth
-      const result = await connectLinkedIn();
-      if (result.success) {
-        // Get fresh session token
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
+async function handleConnectLinkedIn() {
+  if (!user) return;
+  setLinkedInLoading(true);
+  try {
+    const result = await connectLinkedIn();
 
-        // Save token to connected_accounts
-        await supabase.from('connected_accounts').upsert({
-          user_id:      user!.id,
-          provider:     'linkedin',
-          access_token: accessToken ?? null,
-          created_at:   new Date().toISOString(),
-        });
-
-        setLinkedInConnected(true);
-
-        // Immediately sync
-        const syncResult = await manualSyncLinkedIn();
-        refetch();
-
-        Alert.alert(
-          'LinkedIn Connected! 🎉',
-          syncResult.success
-            ? `Profile imported. +${syncResult.xpGained} XP earned.`
-            : 'Connected! Stats will update on next sync.',
-          [{
-            text: 'View Character',
-            onPress: () => router.push('/(tabs)/character'),
-          }]
-        );
-      } else {
-        Alert.alert('Failed', result.error ?? 'Could not connect LinkedIn.');
-      }
-    } catch (e: any) {
-      console.log('LinkedIn connect error:', e);
-      Alert.alert('Error', e?.message ?? 'Something went wrong');
-    } finally {
-      setLinkedInLoading(false);
+    if (!result.success) {
+      Alert.alert('Connection failed', result.error ?? 'Could not connect LinkedIn.');
+      return;
     }
+
+    const accessToken = result.accessToken;
+    if (!accessToken) {
+      Alert.alert('Connection failed', 'LinkedIn token was missing. Please try again.');
+      return;
+    }
+
+    const { error: upsertError } = await supabase.from('connected_accounts').upsert({
+      user_id:      user.id,
+      provider:     'linkedin',
+      access_token: accessToken,
+      created_at:   new Date().toISOString(),
+    }, { onConflict: 'user_id,provider' });
+
+    if (upsertError) throw upsertError;
+
+    setLinkedInConnected(true);
+    const syncResult = await manualSyncLinkedIn();
+    refetch();
+    if (syncResult.success) {
+      Alert.alert('LinkedIn Connected! 🎉', `Career data synced. +${syncResult.xpGained} XP earned.`);
+    } else {
+      Alert.alert('LinkedIn connected', syncResult.error ?? 'Connected, but sync failed. Try resync.');
+    }
+  } catch (e: any) {
+    Alert.alert('Error', e.message);
+  } finally {
+    setLinkedInLoading(false);
+  }
+}
+
+async function handleSignOut() {
+  const doSignOut = async () => {
+    const success = await signOut();
+    if (success) {
+      router.replace('/(auth)/splash');
+      return;
+    }
+
+    Alert.alert('Sign out failed', 'Please try again.');
+  };
+
+  if (Platform.OS === 'web') {
+    const confirmed = globalThis.confirm('Log out of your account?');
+    if (!confirmed) return;
+    await doSignOut();
+    return;
   }
 
+  Alert.alert('Log Out', 'Are you sure?', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Log Out',
+      style: 'destructive',
+      onPress: () => {
+        void doSignOut();
+      },
+    },
+  ]);
+}
   async function handleConnectGoogleFit() {
     setGoogleFitLoading(true);
     try {
@@ -156,15 +160,19 @@ export default function Profile() {
       // First time — do OAuth
       const result = await connectGoogleFit();
       if (result.success) {
-        const { data: { session } } = await supabase.auth.getSession();
-        const accessToken = session?.provider_token;
+        const accessToken = result.accessToken;
+        if (!accessToken || !user) {
+          Alert.alert('Connection failed', 'Google Fit token was missing. Please reconnect.');
+          return;
+        }
 
-        await supabase.from('connected_accounts').upsert({
-          user_id:      user!.id,
+        const { error: upsertError } = await supabase.from('connected_accounts').upsert({
+          user_id:      user.id,
           provider:     'googlefit',
-          access_token: accessToken ?? null,
+          access_token: accessToken,
           created_at:   new Date().toISOString(),
-        });
+        }, { onConflict: 'user_id,provider' });
+        if (upsertError) throw upsertError;
 
         setGoogleFitConnected(true);
 
@@ -190,20 +198,6 @@ export default function Profile() {
     } finally {
       setGoogleFitLoading(false);
     }
-  }
-
-  async function handleSignOut() {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          router.replace('/(auth)/splash');
-        },
-      },
-    ]);
   }
 
   const initials  = user?.email?.slice(0, 2).toUpperCase() ?? 'AL';
