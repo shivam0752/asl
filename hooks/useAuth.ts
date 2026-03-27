@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
+import * as Linking from 'expo-linking'
+import { Platform } from 'react-native'
 
 type AuthSnapshot = {
   user: User | null
@@ -18,6 +20,17 @@ let authSnapshot: AuthSnapshot = {
 }
 const authListeners = new Set<AuthListener>()
 let isAuthInitialized = false
+
+function getEmailRedirectTo(): string {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      return `${window.location.origin}/(auth)/login`
+    }
+    return 'http://localhost:8081/(auth)/login'
+  }
+
+  return Linking.createURL('/(auth)/login')
+}
 
 function notifyAuthListeners() {
   authListeners.forEach((listener) => listener(authSnapshot))
@@ -68,11 +81,25 @@ export function useAuth() {
 
   const signUp = async (email: string, password: string): Promise<boolean> => {
     setError(null)
-    const { error } = await supabase.auth.signUp({ email, password })
+    const normalizedEmail = email.trim().toLowerCase()
+    const { data, error } = await supabase.auth.signUp({
+      email: normalizedEmail,
+      password,
+      options: {
+        emailRedirectTo: getEmailRedirectTo(),
+      },
+    })
     if (error) {
       setError(error.message)
       return false
     }
+
+    // Supabase may return no new identity for an already-registered address.
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      setError('This email is already registered. Try logging in or use "Resend confirmation email".')
+      return false
+    }
+
     return true
   }
 

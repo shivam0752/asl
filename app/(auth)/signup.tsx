@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
-  ScrollView,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
@@ -25,6 +26,18 @@ export default function Signup() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [emailSent, setEmailSent]   = useState(false);
   const [resending, setResending]   = useState(false);
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
+
+  function getEmailRedirectTo(): string {
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin}/(auth)/login`;
+      }
+      return 'http://localhost:8081/(auth)/login';
+    }
+    return 'aetherls://(auth)/login';
+  }
 
   async function handleSignUp() {
     setLocalError(null);
@@ -40,13 +53,23 @@ export default function Signup() {
       setLocalError('Password must be at least 6 characters.');
       return;
     }
-    const success = await signUp(email, password);
+    const normalizedEmail = email.trim().toLowerCase();
+    const success = await signUp(normalizedEmail, password);
     if (success) setEmailSent(true);
   }
 
   async function handleResend() {
     setResending(true);
-    await supabase.auth.resend({ type: 'signup', email });
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+      options: {
+        emailRedirectTo: getEmailRedirectTo(),
+      },
+    });
+    if (resendError) {
+      setLocalError(resendError.message);
+    }
     setResending(false);
   }
 
@@ -70,7 +93,14 @@ export default function Signup() {
           style={styles.primaryButton}
           onPress={() => router.replace('/(auth)/login')}
         >
-          <Text style={styles.primaryButtonText}>GO TO LOGIN</Text>
+          <LinearGradient
+            colors={['#F5C542', '#FFDA73']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.primaryButtonGradient}
+          >
+            <Text style={styles.primaryButtonText}>GO TO LOGIN</Text>
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.resendButton}
@@ -90,19 +120,25 @@ export default function Signup() {
   // ── Signup form ────────────────────────────────────
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: COLORS.background }}
+      style={styles.keyboardRoot}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={[styles.container, compact && styles.containerCompact]}>
+        <View style={styles.heroGlow}>
+          <LinearGradient
+            colors={['rgba(245,197,66,0.24)', 'rgba(245,197,66,0.08)', 'rgba(13,13,13,0)']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={styles.heroGradient}
+          />
+        </View>
+
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Begin your journey</Text>
+        <Text style={[styles.title, compact && styles.titleCompact]}>Create Account</Text>
+        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>Begin your journey</Text>
 
         {displayError && (
           <View style={styles.errorBox}>
@@ -110,86 +146,119 @@ export default function Signup() {
           </View>
         )}
 
-        <View style={styles.form}>
+        <View style={[styles.form, compact && styles.formCompact]}>
           <Text style={styles.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, compact && styles.inputCompact]}
             placeholder="you@example.com"
             placeholderTextColor={COLORS.textSecondary}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
+            returnKeyType="next"
           />
 
           <Text style={styles.label}>Password</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, compact && styles.inputCompact]}
             placeholder="Min. 6 characters"
             placeholderTextColor={COLORS.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            returnKeyType="next"
           />
 
           <Text style={styles.label}>Confirm Password</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, compact && styles.inputCompact]}
             placeholder="Repeat your password"
             placeholderTextColor={COLORS.textSecondary}
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              void handleSignUp();
+            }}
           />
         </View>
 
-        <Text style={styles.trustNote}>
+        <Text style={[styles.trustNote, compact && styles.trustNoteCompact]}>
           We connect your LinkedIn and fitness data to build your character.
         </Text>
 
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, compact && styles.primaryButtonCompact]}
           onPress={handleSignUp}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.primaryButtonText}>SIGN UP</Text>
-          )}
+          <LinearGradient
+            colors={['#F5C542', '#FFDA73']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.primaryButtonGradient}
+          >
+            {loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.primaryButtonText}>SIGN UP</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
 
-        <View style={styles.divider}>
+        <View style={[styles.divider, compact && styles.dividerCompact]}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>or</Text>
           <View style={styles.dividerLine} />
         </View>
 
         <TouchableOpacity
-          style={styles.googleButton}
+          style={[styles.googleButton, compact && styles.googleButtonCompact]}
           onPress={signInWithGoogle}
         >
           <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, compact && styles.footerCompact]}>
           <Text style={styles.footerText}>Already have an account? </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
             <Text style={styles.footerLink}>Log In</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.xl,
-    paddingTop: 60,
-    paddingBottom: SPACING.xl,
+    paddingTop: 40,
+    paddingBottom: SPACING.lg,
+    justifyContent: 'center',
+  },
+  containerCompact: {
+    paddingTop: 20,
+    paddingBottom: SPACING.md,
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -60,
+    left: -20,
+    right: -20,
+    height: 220,
+    pointerEvents: 'none',
+  },
+  heroGradient: {
+    flex: 1,
   },
   backButton: {
     marginBottom: SPACING.lg,
@@ -205,12 +274,18 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     letterSpacing: 1,
   },
+  titleCompact: {
+    fontSize: 30,
+  },
   subtitle: {
     fontFamily: FONTS.body,
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 4,
     marginBottom: SPACING.lg,
+  },
+  subtitleCompact: {
+    marginBottom: SPACING.md,
   },
   errorBox: {
     backgroundColor: '#2D1515',
@@ -227,7 +302,11 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  formCompact: {
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
   label: {
     fontFamily: FONTS.bodyBold,
@@ -247,21 +326,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  inputCompact: {
+    height: 46,
+  },
   trustNote: {
     fontFamily: FONTS.body,
     fontSize: 12,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     lineHeight: 18,
   },
+  trustNoteCompact: {
+    marginBottom: SPACING.sm,
+  },
   primaryButton: {
-    backgroundColor: COLORS.gold,
     height: 52,
     borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  primaryButtonCompact: {
+    height: 48,
+    marginBottom: SPACING.md,
+  },
+  primaryButtonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
   },
   primaryButtonText: {
     fontFamily: FONTS.heading,
@@ -272,8 +364,11 @@ const styles = StyleSheet.create({
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
     gap: SPACING.sm,
+  },
+  dividerCompact: {
+    marginBottom: SPACING.sm,
   },
   dividerLine: {
     flex: 1,
@@ -292,7 +387,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: COLORS.border,
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  googleButtonCompact: {
+    height: 48,
+    marginBottom: SPACING.md,
   },
   googleButtonText: {
     fontFamily: FONTS.bodyBold,
@@ -303,6 +402,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: SPACING.xs,
+  },
+  footerCompact: {
+    marginTop: 0,
   },
   footerText: {
     fontFamily: FONTS.body,

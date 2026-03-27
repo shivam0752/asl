@@ -7,6 +7,7 @@ import {
   calculateGoogleFitXP,
   LinkedInRawData,
 } from './statCalculator';
+import { calculateLevel } from './xpEngine';
 import { StatName } from '../types';
 
 function parseSeniority(title: string): LinkedInRawData['seniorityLevel'] {
@@ -71,8 +72,9 @@ export async function syncLinkedIn(userId: string): Promise<{
       .from('connected_accounts')
       .select('access_token')
       .eq('user_id', userId)
-      .eq('provider', 'linkedin')
-      .single();
+      .in('provider', ['linkedin', 'linkedin_oidc'])
+      .limit(1)
+      .maybeSingle();
 
     console.log('=== LinkedIn token exists:', !!account?.access_token);
 
@@ -141,10 +143,14 @@ export async function syncLinkedIn(userId: string): Promise<{
       stat_delta:    newStats.WIS,
     });
 
+    const newTotalXp = (character.total_xp ?? 0) + xpGained;
+    const newLevel = calculateLevel(newTotalXp);
+
     await supabase
       .from('characters')
       .update({
-        total_xp:   (character.total_xp ?? 0) + xpGained,
+        level:      newLevel,
+        total_xp:   newTotalXp,
         career_xp:  (character.career_xp ?? 0) + xpGained,
         updated_at: new Date().toISOString(),
       })
@@ -169,8 +175,9 @@ export async function syncGoogleFit(userId: string): Promise<{
       .from('connected_accounts')
       .select('access_token')
       .eq('user_id', userId)
-      .eq('provider', 'googlefit')
-      .single();
+      .in('provider', ['googlefit', 'google'])
+      .limit(1)
+      .maybeSingle();
 
     console.log('=== Google Fit token exists:', !!account?.access_token);
 
@@ -222,10 +229,14 @@ export async function syncGoogleFit(userId: string): Promise<{
       stat_delta:    newStats.VIT,
     });
 
+    const newTotalXp = (character.total_xp ?? 0) + xpGained;
+    const newLevel = calculateLevel(newTotalXp);
+
     await supabase
       .from('characters')
       .update({
-        total_xp:   (character.total_xp ?? 0) + xpGained,
+        level:      newLevel,
+        total_xp:   newTotalXp,
         fitness_xp: (character.fitness_xp ?? 0) + xpGained,
         updated_at: new Date().toISOString(),
       })

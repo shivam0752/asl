@@ -6,11 +6,12 @@ import {
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
-  ScrollView,
   Platform,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../hooks/useAuth';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
 
@@ -20,6 +21,8 @@ export default function Login() {
 
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
+  const { height } = useWindowDimensions();
+  const compact = height < 760;
 
   async function handleLogin() {
     if (!email || !password) return;
@@ -29,20 +32,26 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: COLORS.background }}
+      style={styles.keyboardRoot}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <ScrollView
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={[styles.container, compact && styles.containerCompact]}>
+        <View style={styles.heroGlow}>
+          <LinearGradient
+            colors={['rgba(245,197,66,0.24)', 'rgba(245,197,66,0.08)', 'rgba(13,13,13,0)']}
+            start={{ x: 0.2, y: 0 }}
+            end={{ x: 0.8, y: 1 }}
+            style={styles.heroGradient}
+          />
+        </View>
+
         {/* Header */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Welcome Back</Text>
-        <Text style={styles.subtitle}>Continue your journey</Text>
+        <Text style={[styles.title, compact && styles.titleCompact]}>Welcome Back</Text>
+        <Text style={[styles.subtitle, compact && styles.subtitleCompact]}>Continue your journey</Text>
 
         {/* Error */}
         {error && (
@@ -58,16 +67,17 @@ export default function Login() {
         )}
 
         {/* Inputs */}
-        <View style={styles.form}>
+        <View style={[styles.form, compact && styles.formCompact]}>
           <Text style={styles.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, compact && styles.inputCompact]}
             placeholder="you@example.com"
             placeholderTextColor={COLORS.textSecondary}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
             keyboardType="email-address"
+            returnKeyType="next"
           />
 
           <View style={styles.passwordHeader}>
@@ -77,30 +87,41 @@ export default function Login() {
             </TouchableOpacity>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, compact && styles.inputCompact]}
             placeholder="Your password"
             placeholderTextColor={COLORS.textSecondary}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            returnKeyType="go"
+            onSubmitEditing={() => {
+              void handleLogin();
+            }}
           />
         </View>
 
         {/* Login button */}
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[styles.primaryButton, compact && styles.primaryButtonCompact]}
           onPress={handleLogin}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#000" />
-          ) : (
-            <Text style={styles.primaryButtonText}>LOG IN</Text>
-          )}
+          <LinearGradient
+            colors={['#F5C542', '#FFDA73']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.primaryButtonGradient}
+          >
+            {loading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.primaryButtonText}>LOG IN</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
 
         {/* Divider */}
-        <View style={styles.divider}>
+        <View style={[styles.divider, compact && styles.dividerCompact]}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>or</Text>
           <View style={styles.dividerLine} />
@@ -108,31 +129,51 @@ export default function Login() {
 
         {/* Google */}
         <TouchableOpacity
-          style={styles.googleButton}
+          style={[styles.googleButton, compact && styles.googleButtonCompact]}
           onPress={signInWithGoogle}
         >
           <Text style={styles.googleButtonText}>Continue with Google</Text>
         </TouchableOpacity>
 
         {/* Footer */}
-        <View style={styles.footer}>
+        <View style={[styles.footer, compact && styles.footerCompact]}>
           <Text style={styles.footerText}>New here? </Text>
           <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
             <Text style={styles.footerLink}>Create Account</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardRoot: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: COLORS.background,
     paddingHorizontal: SPACING.xl,
     paddingTop: 60,
-    paddingBottom: SPACING.xl,
+    paddingBottom: SPACING.lg,
+    justifyContent: 'center',
+  },
+  containerCompact: {
+    paddingTop: 24,
+    paddingBottom: SPACING.md,
+  },
+  heroGlow: {
+    position: 'absolute',
+    top: -60,
+    left: -20,
+    right: -20,
+    height: 220,
+    pointerEvents: 'none',
+  },
+  heroGradient: {
+    flex: 1,
   },
   backButton: {
     marginBottom: SPACING.lg,
@@ -148,12 +189,18 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     letterSpacing: 1,
   },
+  titleCompact: {
+    fontSize: 30,
+  },
   subtitle: {
     fontFamily: FONTS.body,
     fontSize: 14,
     color: COLORS.textSecondary,
     marginTop: 4,
     marginBottom: SPACING.lg,
+  },
+  subtitleCompact: {
+    marginBottom: SPACING.md,
   },
   errorBox: {
     backgroundColor: '#2D1515',
@@ -178,6 +225,10 @@ const styles = StyleSheet.create({
   form: {
     gap: SPACING.sm,
     marginBottom: SPACING.lg,
+  },
+  formCompact: {
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   label: {
     fontFamily: FONTS.bodyBold,
@@ -208,13 +259,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  inputCompact: {
+    height: 48,
+  },
   primaryButton: {
-    backgroundColor: COLORS.gold,
     height: 52,
     borderRadius: BORDER_RADIUS.md,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  primaryButtonCompact: {
+    height: 48,
+    marginBottom: SPACING.md,
+  },
+  primaryButtonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
   },
   primaryButtonText: {
     fontFamily: FONTS.heading,
@@ -227,6 +288,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.lg,
     gap: SPACING.sm,
+  },
+  dividerCompact: {
+    marginBottom: SPACING.md,
   },
   dividerLine: {
     flex: 1,
@@ -247,6 +311,10 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     marginBottom: SPACING.xl,
   },
+  googleButtonCompact: {
+    height: 48,
+    marginBottom: SPACING.md,
+  },
   googleButtonText: {
     fontFamily: FONTS.bodyBold,
     fontSize: 15,
@@ -256,6 +324,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: SPACING.sm,
+  },
+  footerCompact: {
+    marginTop: 0,
   },
   footerText: {
     fontFamily: FONTS.body,

@@ -64,7 +64,7 @@ export default function ConnectGoogleFit() {
             statsData: stats,
           });
 
-          router.replace('/(onboarding)/generating');
+          router.replace('/(onboarding)/set-display-name');
         } else {
           router.replace('/(onboarding)/manual-entry');
         }

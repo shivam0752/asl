@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { ActivityIndicator, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import type { DimensionValue } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, STAT_COLORS } from '../../constants/theme'
 import type { StatName } from '../../types'
 import { calculateLevelThreshold, xpToNextLevel, xpProgressPercent } from '../../utils/xpEngine'
@@ -99,13 +100,19 @@ export default function LevelUpModal({
   return (
     <Modal transparent visible={visible} animationType="fade">
       <View style={styles.overlay}>
-        <View style={styles.decor} pointerEvents="none">
+        <View style={styles.decor}>
           <View style={styles.decorLineA} />
           <View style={styles.decorLineB} />
           <View style={styles.decorLineC} />
         </View>
 
         <View style={styles.card}>
+          <LinearGradient
+            colors={['#1C1C1C', '#161616', '#111111']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.cardGradient}
+          />
           <View style={styles.headerRow}>
             <Text style={styles.title}>LEVEL UP</Text>
 
@@ -172,7 +179,14 @@ export default function LevelUpModal({
               )}
 
               <TouchableOpacity style={styles.primaryButton} onPress={onClose}>
-                <Text style={styles.primaryButtonText}>Continue</Text>
+                <LinearGradient
+                  colors={['#F5C542', '#FFDA73']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.primaryButtonGradient}
+                >
+                  <Text style={styles.primaryButtonText}>Continue</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
@@ -185,8 +199,7 @@ export default function LevelUpModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: COLORS.background,
-    opacity: 0.92,
+    backgroundColor: 'rgba(8,8,8,0.92)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
@@ -235,13 +248,16 @@ const styles = StyleSheet.create({
 
   card: {
     width: '100%',
-    backgroundColor: COLORS.surface,
+    backgroundColor: '#151515',
     borderColor: COLORS.gold,
     borderWidth: 1,
     borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     overflow: 'hidden',
+  },
+  cardGradient: {
+    ...StyleSheet.absoluteFillObject,
   },
 
   headerRow: {
@@ -442,9 +458,12 @@ const styles = StyleSheet.create({
   },
 
   primaryButton: {
-    backgroundColor: COLORS.gold,
     height: 54,
     borderRadius: BORDER_RADIUS.md,
+    overflow: 'hidden',
+  },
+  primaryButtonGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -79,7 +79,7 @@ export default function Character() {
           <View style={styles.xpLabels}>
             <Text style={styles.xpLabel}>LVL {character.level}</Text>
             <Text style={styles.xpValue}>
-              {character.totalXp} / {character.totalXp + toNext} XP
+              {toNext} XP to next level
             </Text>
           </View>
           <View style={styles.xpBarBg}>

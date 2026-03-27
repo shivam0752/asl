@@ -46,7 +46,7 @@ export default function ManualEntry() {
         linkedin_raw: { jobTitle: formData.jobTitle, yearsExperience: formData.yearsExperience, educationLevel: formData.educationLevel },
         updated_at: new Date().toISOString(),
       });
-      router.replace('/(onboarding)/generating');
+      router.replace('/(onboarding)/set-display-name');
     } catch (e: any) {
       setLocalError(e?.message ?? 'Error saving data');
     }

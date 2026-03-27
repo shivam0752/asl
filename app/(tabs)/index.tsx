@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useXPEvents } from '../../hooks/useStats';
 import { useSync } from '../../hooks/useSync';
@@ -22,6 +23,7 @@ const STAT_ORDER: StatName[] = ['STR', 'INT', 'WIS', 'VIT', 'CHA', 'AGI'];
 export default function Home() {
   const router                          = useRouter();
   const { user }                        = useAuth();
+  const { profile }                     = useProfile(user?.id);
   const { character, stats, loading }   = useCharacter(user?.id);
   const { events }                      = useXPEvents(user?.id);
   const { syncing, lastSyncResult }     = useSync(user?.id);
@@ -71,7 +73,7 @@ export default function Home() {
         <View>
           <Text style={styles.greeting}>Welcome back</Text>
           <Text style={styles.username}>
-            {user?.email?.split('@')[0] ?? 'Hero'}
+            {profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero'}
           </Text>
         </View>
         <View style={styles.levelBadge}>
@@ -87,7 +89,7 @@ export default function Home() {
         <View style={styles.xpLabels}>
           <Text style={styles.xpLabel}>XP Progress</Text>
           <Text style={styles.xpValue}>
-            {totalXp} · {toNext} to next level
+            {toNext} to next level
           </Text>
         </View>
         <View style={styles.xpBarBg}>

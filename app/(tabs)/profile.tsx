@@ -8,9 +8,14 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
+import { useProfile } from '../../hooks/useProfile';
 import { useCharacter } from '../../hooks/useCharacter';
 import { useSync } from '../../hooks/useSync';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
@@ -19,10 +24,13 @@ import FeedbackModal from '../../components/modals/FeedbackModal';
 import { connectLinkedIn } from '../../lib/linkedin';
 import { connectGoogleFit } from '../../lib/googlefit';
 import { supabase } from '../../lib/supabase';
+import { APP_ASSETS } from '../../constants/assets';
 
 export default function Profile() {
   const router                                      = useRouter();
   const { user, signOut }                           = useAuth();
+  const { profile, refetch: refetchProfile, updateUsername, updating: nameUpdating } =
+                                                      useProfile(user?.id);
   const { character, loading, refetch }             = useCharacter(user?.id);
   const {
     syncing,
@@ -34,12 +42,15 @@ export default function Profile() {
   const [googleFitLoading, setGoogleFitLoading]     = useState(false);
   const [linkedInConnected, setLinkedInConnected]   = useState(false);
   const [googleFitConnected, setGoogleFitConnected] = useState(false);
+  const [showNameModal, setShowNameModal]           = useState(false);
+  const [nameDraft, setNameDraft]                   = useState('');
 
   // Refetch on focus
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [])
+      void refetchProfile();
+    }, [refetch, refetchProfile])
   );
 
   // Check existing connections
@@ -52,8 +63,12 @@ export default function Profile() {
         .eq('user_id', user.id);
 
       if (data) {
-        setLinkedInConnected(data.some((a) => a.provider === 'linkedin'));
-        setGoogleFitConnected(data.some((a) => a.provider === 'googlefit'));
+        setLinkedInConnected(
+          data.some((a) => a.provider === 'linkedin' || a.provider === 'linkedin_oidc')
+        );
+        setGoogleFitConnected(
+          data.some((a) => a.provider === 'googlefit' || a.provider === 'google')
+        );
       }
     }
     checkConnections();
@@ -65,6 +80,25 @@ async function handleConnectLinkedIn() {
   if (!user) return;
   setLinkedInLoading(true);
   try {
+    // Existing connection should directly resync without forcing OAuth each time.
+    if (linkedInConnected) {
+      const syncResult = await manualSyncLinkedIn();
+      if (syncResult.success) {
+        refetch();
+        Alert.alert(
+          'LinkedIn Resynced! ✓',
+          `Career stats updated. +${syncResult.xpGained} XP earned.`
+        );
+      } else {
+        setLinkedInConnected(false);
+        Alert.alert(
+          'Sync failed',
+          syncResult.error ?? 'LinkedIn session may have expired. Please reconnect.'
+        );
+      }
+      return;
+    }
+
     const result = await connectLinkedIn();
 
     if (!result.success) {
@@ -200,8 +234,14 @@ async function handleSignOut() {
     }
   }
 
-  const initials  = user?.email?.slice(0, 2).toUpperCase() ?? 'AL';
-  const username  = user?.email?.split('@')[0] ?? 'Hero';
+  const displayName =
+    profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero';
+  const initials = (() => {
+    const s = displayName.trim();
+    if (s.length >= 2) return s.slice(0, 2).toUpperCase();
+    if (s.length === 1) return (s + s).toUpperCase();
+    return (user?.email?.slice(0, 2) ?? 'AL').toUpperCase();
+  })();
   const className = character
     ? getClassName(character.class, character.tier)
     : null;
@@ -217,7 +257,16 @@ async function handleSignOut() {
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
-        <Text style={styles.username}>{username}</Text>
+        <TouchableOpacity
+          onPress={() => {
+            setNameDraft(displayName);
+            setShowNameModal(true);
+          }}
+          accessibilityLabel="Edit display name"
+        >
+          <Text style={styles.username}>{displayName}</Text>
+          <Text style={styles.editNameHint}>Tap to edit name</Text>
+        </TouchableOpacity>
         {className && (
           <Text style={styles.className}>
             {className} · {character?.tier} Tier
@@ -241,7 +290,11 @@ async function handleSignOut() {
         {/* LinkedIn */}
         <View style={styles.accountRow}>
           <View style={[styles.accountLogo, { backgroundColor: '#0A66C2' }]}>
-            <Text style={styles.accountLogoText}>in</Text>
+            {APP_ASSETS.linkedinLogo ? (
+              <Image source={APP_ASSETS.linkedinLogo} style={styles.accountLogoImage} resizeMode="contain" />
+            ) : (
+              <Text style={styles.accountLogoText}>in</Text>
+            )}
           </View>
           <View style={styles.accountInfo}>
             <Text style={styles.accountName}>LinkedIn</Text>
@@ -276,7 +329,11 @@ async function handleSignOut() {
         {/* Google Fit */}
         <View style={styles.accountRow}>
           <View style={[styles.accountLogo, { backgroundColor: '#4285F4' }]}>
-            <Text style={styles.accountLogoText}>G</Text>
+            {APP_ASSETS.googleFitLogo ? (
+              <Image source={APP_ASSETS.googleFitLogo} style={styles.accountLogoImage} resizeMode="contain" />
+            ) : (
+              <Text style={styles.accountLogoText}>G</Text>
+            )}
           </View>
           <View style={styles.accountInfo}>
             <Text style={styles.accountName}>Google Fit</Text>
@@ -316,6 +373,15 @@ async function handleSignOut() {
       <View style={styles.section}>
         {[
           {
+            label:   'Display name',
+            icon:    '✏️',
+            subtitle: displayName,
+            onPress: () => {
+              setNameDraft(displayName);
+              setShowNameModal(true);
+            },
+          },
+          {
             label:   'Give Feedback',
             icon:    '💬',
             onPress: () => setShowFeedback(true),
@@ -337,7 +403,14 @@ async function handleSignOut() {
             onPress={item.onPress}
           >
             <Text style={styles.settingsIcon}>{item.icon}</Text>
-            <Text style={styles.settingsLabel}>{item.label}</Text>
+            <View style={styles.settingsLabelCol}>
+              <Text style={styles.settingsLabel}>{item.label}</Text>
+              {'subtitle' in item && item.subtitle ? (
+                <Text style={styles.settingsSubtitle} numberOfLines={1}>
+                  {item.subtitle}
+                </Text>
+              ) : null}
+            </View>
             <Text style={styles.settingsChevron}>›</Text>
           </TouchableOpacity>
         ))}
@@ -354,6 +427,63 @@ async function handleSignOut() {
         visible={showFeedback}
         onClose={() => setShowFeedback(false)}
       />
+
+      <Modal
+        visible={showNameModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNameModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Display name</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder="Your name"
+              placeholderTextColor={COLORS.textSecondary}
+              autoCapitalize="words"
+              maxLength={40}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalBtnGhost}
+                onPress={() => setShowNameModal(false)}
+              >
+                <Text style={styles.modalBtnGhostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalBtnPrimary}
+                onPress={async () => {
+                  if (!user || !nameDraft.trim()) return;
+                  try {
+                    await updateUsername({
+                      userId: user.id,
+                      username: nameDraft,
+                    });
+                    setShowNameModal(false);
+                  } catch (e: unknown) {
+                    const msg =
+                      e instanceof Error ? e.message : 'Could not update name.';
+                    Alert.alert('Error', msg);
+                  }
+                }}
+                disabled={nameUpdating || !nameDraft.trim()}
+              >
+                {nameUpdating ? (
+                  <ActivityIndicator color="#000" size="small" />
+                ) : (
+                  <Text style={styles.modalBtnPrimaryText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -391,7 +521,14 @@ const styles = StyleSheet.create({
     fontFamily:    FONTS.bodyBold,
     fontSize:      20,
     color:         COLORS.textPrimary,
-    textTransform: 'capitalize',
+    textAlign:     'center',
+  },
+  editNameHint: {
+    fontFamily: FONTS.body,
+    fontSize:   11,
+    color:      COLORS.textSecondary,
+    marginTop:  4,
+    textAlign:  'center',
   },
   className: {
     fontFamily: FONTS.body,
@@ -442,6 +579,10 @@ const styles = StyleSheet.create({
     fontSize:   18,
     color:      '#FFFFFF',
   },
+  accountLogoImage: {
+    width: 24,
+    height: 24,
+  },
   accountInfo: {
     flex: 1,
   },
@@ -486,11 +627,19 @@ const styles = StyleSheet.create({
   settingsIcon: {
     fontSize: 18,
   },
+  settingsLabelCol: {
+    flex: 1,
+    gap: 2,
+  },
   settingsLabel: {
     fontFamily: FONTS.body,
     fontSize:   15,
     color:      COLORS.textPrimary,
-    flex:       1,
+  },
+  settingsSubtitle: {
+    fontFamily: FONTS.body,
+    fontSize:   12,
+    color:      COLORS.textSecondary,
   },
   settingsChevron: {
     fontFamily: FONTS.body,
@@ -505,5 +654,64 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bodyBold,
     fontSize:   15,
     color:      COLORS.error,
+  },
+  modalOverlay: {
+    flex:            1,
+    backgroundColor: 'rgba(0,0,0,0.85)',
+    justifyContent:  'center',
+    paddingHorizontal: SPACING.xl,
+  },
+  modalCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius:    BORDER_RADIUS.lg,
+    borderWidth:     1,
+    borderColor:     COLORS.border,
+    padding:         SPACING.lg,
+    gap:             SPACING.md,
+  },
+  modalTitle: {
+    fontFamily: FONTS.heading,
+    fontSize:   20,
+    color:      COLORS.gold,
+  },
+  modalInput: {
+    backgroundColor: COLORS.background,
+    borderRadius:    BORDER_RADIUS.md,
+    borderWidth:     1,
+    borderColor:     COLORS.border,
+    paddingHorizontal: SPACING.md,
+    height:          48,
+    color:           COLORS.textPrimary,
+    fontFamily:      FONTS.body,
+    fontSize:        16,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap:            SPACING.md,
+    marginTop:      SPACING.sm,
+  },
+  modalBtnGhost: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  modalBtnGhostText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize:   14,
+    color:      COLORS.textSecondary,
+  },
+  modalBtnPrimary: {
+    backgroundColor: COLORS.gold,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.md,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalBtnPrimaryText: {
+    fontFamily: FONTS.bodyBold,
+    fontSize:   14,
+    color:      '#000000',
   },
 });
