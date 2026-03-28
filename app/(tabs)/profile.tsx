@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Dynamic notch/camera handling
 import { useAuth } from '../../hooks/useAuth';
 import { useProfile } from '../../hooks/useProfile';
 import { useCharacter } from '../../hooks/useCharacter';
@@ -21,31 +22,22 @@ import { useSync } from '../../hooks/useSync';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS } from '../../constants/theme';
 import { getClassName } from '../../constants/classes';
 import FeedbackModal from '../../components/modals/FeedbackModal';
-import { connectLinkedIn } from '../../lib/linkedin';
-import { connectGoogleFit } from '../../lib/googlefit';
 import { supabase } from '../../lib/supabase';
-import { APP_ASSETS } from '../../constants/assets';
 
 export default function Profile() {
-  const router                                      = useRouter();
-  const { user, signOut }                           = useAuth();
-  const { profile, refetch: refetchProfile, updateUsername, updating: nameUpdating } =
-                                                      useProfile(user?.id);
-  const { character, loading, refetch }             = useCharacter(user?.id);
-  const {
-    syncing,
-    manualSyncLinkedIn,
-    manualSyncGoogleFit,
-  }                                                 = useSync(user?.id);
-  const [showFeedback, setShowFeedback]             = useState(false);
-  const [linkedInLoading, setLinkedInLoading]       = useState(false);
-  const [googleFitLoading, setGoogleFitLoading]     = useState(false);
-  const [linkedInConnected, setLinkedInConnected]   = useState(false);
-  const [googleFitConnected, setGoogleFitConnected] = useState(false);
-  const [showNameModal, setShowNameModal]           = useState(false);
-  const [nameDraft, setNameDraft]                   = useState('');
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user, signOut } = useAuth();
+  const { profile, refetch: refetchProfile, updateUsername, updating: nameUpdating } = useProfile(user?.id);
+  const { character, refetch } = useCharacter(user?.id);
+  const { syncing } = useSync(user?.id);
 
-  // Refetch on focus
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [linkedInConnected, setLinkedInConnected] = useState(false);
+  const [googleFitConnected, setGoogleFitConnected] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
   useFocusEffect(
     useCallback(() => {
       refetch();
@@ -53,665 +45,233 @@ export default function Profile() {
     }, [refetch, refetchProfile])
   );
 
-  // Check existing connections
   useEffect(() => {
     async function checkConnections() {
       if (!user) return;
-      const { data } = await supabase
-        .from('connected_accounts')
-        .select('provider')
-        .eq('user_id', user.id);
-
+      const { data } = await supabase.from('connected_accounts').select('provider').eq('user_id', user.id);
       if (data) {
-        setLinkedInConnected(
-          data.some((a) => a.provider === 'linkedin' || a.provider === 'linkedin_oidc')
-        );
-        setGoogleFitConnected(
-          data.some((a) => a.provider === 'googlefit' || a.provider === 'google')
-        );
+        setLinkedInConnected(data.some((a) => a.provider === 'linkedin' || a.provider === 'linkedin_oidc'));
+        setGoogleFitConnected(data.some((a) => a.provider === 'googlefit' || a.provider === 'google'));
       }
     }
     checkConnections();
   }, [user]);
 
-// app/(tabs)/profile.tsx (Partial - modifying the handlers)
-
-async function handleConnectLinkedIn() {
-  if (!user) return;
-  setLinkedInLoading(true);
-  try {
-    // Existing connection should directly resync without forcing OAuth each time.
-    if (linkedInConnected) {
-      const syncResult = await manualSyncLinkedIn();
-      if (syncResult.success) {
-        refetch();
-        Alert.alert(
-          'LinkedIn Resynced! ✓',
-          `Career stats updated. +${syncResult.xpGained} XP earned.`
-        );
-      } else {
-        setLinkedInConnected(false);
-        Alert.alert(
-          'Sync failed',
-          syncResult.error ?? 'LinkedIn session may have expired. Please reconnect.'
-        );
-      }
-      return;
-    }
-
-    const result = await connectLinkedIn();
-
-    if (!result.success) {
-      Alert.alert('Connection failed', result.error ?? 'Could not connect LinkedIn.');
-      return;
-    }
-
-    const accessToken = result.accessToken;
-    if (!accessToken) {
-      Alert.alert('Connection failed', 'LinkedIn token was missing. Please try again.');
-      return;
-    }
-
-    const { error: upsertError } = await supabase.from('connected_accounts').upsert({
-      user_id:      user.id,
-      provider:     'linkedin',
-      access_token: accessToken,
-      created_at:   new Date().toISOString(),
-    }, { onConflict: 'user_id,provider' });
-
-    if (upsertError) throw upsertError;
-
-    setLinkedInConnected(true);
-    const syncResult = await manualSyncLinkedIn();
-    refetch();
-    if (syncResult.success) {
-      Alert.alert('LinkedIn Connected! 🎉', `Career data synced. +${syncResult.xpGained} XP earned.`);
-    } else {
-      Alert.alert('LinkedIn connected', syncResult.error ?? 'Connected, but sync failed. Try resync.');
-    }
-  } catch (e: any) {
-    Alert.alert('Error', e.message);
-  } finally {
-    setLinkedInLoading(false);
-  }
-}
-
-async function handleSignOut() {
-  const doSignOut = async () => {
-    const success = await signOut();
-    if (success) {
-      router.replace('/(auth)/splash');
-      return;
-    }
-
-    Alert.alert('Sign out failed', 'Please try again.');
+  const handleSignOut = async () => {
+    Alert.alert('SYSTEM LOGOUT', 'Disconnect neural link and exit?', [
+      { text: 'CANCEL', style: 'cancel' },
+      { 
+        text: 'EXIT', 
+        style: 'destructive', 
+        onPress: async () => {
+          const success = await signOut();
+          if (success) router.replace('/(auth)/splash');
+        } 
+      },
+    ]);
   };
 
-  if (Platform.OS === 'web') {
-    const confirmed = globalThis.confirm('Log out of your account?');
-    if (!confirmed) return;
-    await doSignOut();
-    return;
-  }
-
-  Alert.alert('Log Out', 'Are you sure?', [
-    { text: 'Cancel', style: 'cancel' },
-    {
-      text: 'Log Out',
-      style: 'destructive',
-      onPress: () => {
-        void doSignOut();
-      },
-    },
-  ]);
-}
-  async function handleConnectGoogleFit() {
-    setGoogleFitLoading(true);
-    try {
-      // Already connected — just resync
-      if (googleFitConnected) {
-        const result = await manualSyncGoogleFit();
-        if (result.success) {
-          refetch();
-          Alert.alert(
-            'Google Fit Resynced! ✓',
-            `Stats updated. +${result.xpGained} XP earned.`,
-            [{
-              text: 'View Character',
-              onPress: () => router.push('/(tabs)/character'),
-            }]
-          );
-        } else {
-          setGoogleFitConnected(false);
-          Alert.alert(
-            'Sync failed',
-            'Your Google Fit session expired. Please reconnect.',
-          );
-        }
-        return;
-      }
-
-      // First time — do OAuth
-      const result = await connectGoogleFit();
-      if (result.success) {
-        const accessToken = result.accessToken;
-        if (!accessToken || !user) {
-          Alert.alert('Connection failed', 'Google Fit token was missing. Please reconnect.');
-          return;
-        }
-
-        const { error: upsertError } = await supabase.from('connected_accounts').upsert({
-          user_id:      user.id,
-          provider:     'googlefit',
-          access_token: accessToken,
-          created_at:   new Date().toISOString(),
-        }, { onConflict: 'user_id,provider' });
-        if (upsertError) throw upsertError;
-
-        setGoogleFitConnected(true);
-
-        const syncResult = await manualSyncGoogleFit();
-        refetch();
-
-        Alert.alert(
-          'Google Fit Connected! 🎉',
-          syncResult.success
-            ? `Fitness data imported. +${syncResult.xpGained} XP earned.`
-            : 'Connected! Stats will update on next sync.',
-          [{
-            text: 'View Character',
-            onPress: () => router.push('/(tabs)/character'),
-          }]
-        );
-      } else {
-        Alert.alert('Failed', result.error ?? 'Could not connect Google Fit.');
-      }
-    } catch (e: any) {
-      console.log('Google Fit connect error:', e);
-      Alert.alert('Error', e?.message ?? 'Something went wrong');
-    } finally {
-      setGoogleFitLoading(false);
-    }
-  }
-
-  const displayName =
-    profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero';
-  const initials = (() => {
-    const s = displayName.trim();
-    if (s.length >= 2) return s.slice(0, 2).toUpperCase();
-    if (s.length === 1) return (s + s).toUpperCase();
-    return (user?.email?.slice(0, 2) ?? 'AL').toUpperCase();
-  })();
-  const className = character
-    ? getClassName(character.class, character.tier)
-    : null;
+  const displayName = profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero';
+  const className = character ? getClassName(character.class, character.tier) : null;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Avatar */}
-      <View style={styles.avatarSection}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{initials}</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => {
-            setNameDraft(displayName);
-            setShowNameModal(true);
-          }}
-          accessibilityLabel="Edit display name"
-        >
-          <Text style={styles.username}>{displayName}</Text>
-          <Text style={styles.editNameHint}>Tap to edit name</Text>
-        </TouchableOpacity>
-        {className && (
-          <Text style={styles.className}>
-            {className} · {character?.tier} Tier
-          </Text>
-        )}
-        <Text style={styles.joinedText}>
-          Joined{' '}
-          {new Date(user?.created_at ?? '').toLocaleDateString('en-US', {
-            month: 'long',
-            year:  'numeric',
-          })}
-        </Text>
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* Connected accounts */}
-      <Text style={styles.sectionTitle}>CONNECTED ACCOUNTS</Text>
-      <View style={styles.section}>
-
-        {/* LinkedIn */}
-        <View style={styles.accountRow}>
-          <View style={[styles.accountLogo, { backgroundColor: '#0A66C2' }]}>
-            {APP_ASSETS.linkedinLogo ? (
-              <Image source={APP_ASSETS.linkedinLogo} style={styles.accountLogoImage} resizeMode="contain" />
-            ) : (
-              <Text style={styles.accountLogoText}>in</Text>
-            )}
-          </View>
-          <View style={styles.accountInfo}>
-            <Text style={styles.accountName}>LinkedIn</Text>
-            <Text style={[
-              styles.accountStatus,
-              linkedInConnected && { color: COLORS.success },
-            ]}>
-              {linkedInConnected ? '✓ Connected' : 'Not connected'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              linkedInConnected && styles.actionBtnConnected,
-            ]}
-            onPress={handleConnectLinkedIn}
-            disabled={linkedInLoading || syncing}
-          >
-            {linkedInLoading || syncing ? (
-              <ActivityIndicator color={COLORS.gold} size="small" />
-            ) : (
-              <Text style={[
-                styles.actionBtnText,
-                linkedInConnected && styles.actionBtnTextConnected,
-              ]}>
-                {linkedInConnected ? 'Resync' : 'Connect'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Google Fit */}
-        <View style={styles.accountRow}>
-          <View style={[styles.accountLogo, { backgroundColor: '#4285F4' }]}>
-            {APP_ASSETS.googleFitLogo ? (
-              <Image source={APP_ASSETS.googleFitLogo} style={styles.accountLogoImage} resizeMode="contain" />
-            ) : (
-              <Text style={styles.accountLogoText}>G</Text>
-            )}
-          </View>
-          <View style={styles.accountInfo}>
-            <Text style={styles.accountName}>Google Fit</Text>
-            <Text style={[
-              styles.accountStatus,
-              googleFitConnected && { color: COLORS.success },
-            ]}>
-              {googleFitConnected ? '✓ Connected' : 'Not connected'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              googleFitConnected && styles.actionBtnConnected,
-            ]}
-            onPress={handleConnectGoogleFit}
-            disabled={googleFitLoading || syncing}
-          >
-            {googleFitLoading || syncing ? (
-              <ActivityIndicator color={COLORS.gold} size="small" />
-            ) : (
-              <Text style={[
-                styles.actionBtnText,
-                googleFitConnected && styles.actionBtnTextConnected,
-              ]}>
-                {googleFitConnected ? 'Resync' : 'Connect'}
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* Settings */}
-      <Text style={styles.sectionTitle}>APP</Text>
-      <View style={styles.section}>
-        {[
-          {
-            label:   'Display name',
-            icon:    '✏️',
-            subtitle: displayName,
-            onPress: () => {
-              setNameDraft(displayName);
-              setShowNameModal(true);
-            },
-          },
-          {
-            label:   'Give Feedback',
-            icon:    '💬',
-            onPress: () => setShowFeedback(true),
-          },
-          {
-            label:   'Privacy & Data',
-            icon:    '🔒',
-            onPress: () => Alert.alert('Coming soon'),
-          },
-          {
-            label:   'Help & FAQ',
-            icon:    '❓',
-            onPress: () => Alert.alert('Coming soon'),
-          },
-        ].map((item, i) => (
-          <TouchableOpacity
-            key={i}
-            style={styles.settingsRow}
-            onPress={item.onPress}
-          >
-            <Text style={styles.settingsIcon}>{item.icon}</Text>
-            <View style={styles.settingsLabelCol}>
-              <Text style={styles.settingsLabel}>{item.label}</Text>
-              {'subtitle' in item && item.subtitle ? (
-                <Text style={styles.settingsSubtitle} numberOfLines={1}>
-                  {item.subtitle}
-                </Text>
-              ) : null}
-            </View>
-            <Text style={styles.settingsChevron}>›</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* Log out */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-
-      <FeedbackModal
-        visible={showFeedback}
-        onClose={() => setShowFeedback(false)}
-      />
-
-      <Modal
-        visible={showNameModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowNameModal(false)}
+    <View style={styles.safeArea}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={[
+            styles.contentContainer, 
+            { paddingTop: insets.top + 20 } // Push content below camera
+        ]} 
+        showsVerticalScrollIndicator={false}
       >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Display name</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={nameDraft}
-              onChangeText={setNameDraft}
-              placeholder="Your name"
-              placeholderTextColor={COLORS.textSecondary}
-              autoCapitalize="words"
-              maxLength={40}
+        <Text style={styles.pageTitle}>SYSTEM SETTINGS</Text>
+
+        {/* IDENTITY CARD */}
+        <View style={styles.identityCard}>
+          <View style={styles.avatarGlow}>
+            <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.nameRow}
+            onPress={() => { setNameDraft(displayName); setShowNameModal(true); }}
+          >
+            <Text style={styles.username}>{displayName}</Text>
+            {/* LOGO PLACEHOLDER */}
+            <Image 
+                source={require('../../assets/branding/pen.png')} 
+                style={styles.editLogo}
+                resizeMode="contain"
             />
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalBtnGhost}
-                onPress={() => setShowNameModal(false)}
-              >
-                <Text style={styles.modalBtnGhostText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalBtnPrimary}
+          </TouchableOpacity>
+
+          {className && <Text style={styles.classTier}>{className.toUpperCase()} · {character?.tier} TIER</Text>}
+        </View>
+
+        {/* CONNECTION STATUS */}
+        <Text style={styles.sectionHeader}>NEURAL DATA LINKS</Text>
+        <View style={styles.linkList}>
+          <View style={styles.linkRow}>
+            <View style={[styles.linkIcon, { backgroundColor: '#0A66C2' }]}>
+              <Text style={styles.linkIconText}>in</Text>
+            </View>
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>Career Stream</Text>
+              <Text style={[styles.linkStatus, linkedInConnected && { color: '#00E6FF' }]}>
+                {linkedInConnected ? 'ACTIVE' : 'DISCONNECTED'}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.linkAction, linkedInConnected && styles.linkActionActive]} 
+              disabled={syncing}
+            >
+              <Text style={styles.linkActionText}>{linkedInConnected ? 'RESYNC' : 'LINK'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.linkRow}>
+            <View style={[styles.linkIcon, { backgroundColor: '#4285F4' }]}>
+              <Text style={styles.linkIconText}>G</Text>
+            </View>
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>Fitness Stream</Text>
+              <Text style={[styles.linkStatus, googleFitConnected && { color: '#00E6FF' }]}>
+                {googleFitConnected ? 'ACTIVE' : 'DISCONNECTED'}
+              </Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.linkAction, googleFitConnected && styles.linkActionActive]} 
+              disabled={syncing}
+            >
+              <Text style={styles.linkActionText}>{googleFitConnected ? 'RESYNC' : 'LINK'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* APP SETTINGS */}
+        <Text style={styles.sectionHeader}>CORE CONFIGURATION</Text>
+        <View style={styles.settingsGroup}>
+          {[
+            { label: 'Privacy Protocol', icon: '🔒' },
+            { label: 'Neural Feedback', icon: '💬', onPress: () => setShowFeedback(true) },
+            { label: 'System Documentation', icon: '❓' },
+          ].map((item, i) => (
+            <TouchableOpacity key={i} style={styles.settingItem} onPress={item.onPress}>
+              <Text style={styles.settingIcon}>{item.icon}</Text>
+              <Text style={styles.settingLabel}>{item.label}</Text>
+              <Text style={styles.settingChevron}>›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleSignOut}>
+          <Text style={styles.logoutText}>TERMINATE SESSION</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <FeedbackModal visible={showFeedback} onClose={() => setShowFeedback(false)} />
+      
+      <Modal visible={showNameModal} transparent animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>REWRITE IDENTITY</Text>
+            <TextInput 
+              style={styles.modalInput} 
+              value={nameDraft} 
+              onChangeText={setNameDraft} 
+              placeholderTextColor="rgba(255,255,255,0.3)"
+              autoFocus
+            />
+            <View style={styles.modalButtons}>
+              <TouchableOpacity onPress={() => setShowNameModal(false)}><Text style={styles.cancelText}>ABORT</Text></TouchableOpacity>
+              <TouchableOpacity 
                 onPress={async () => {
-                  if (!user || !nameDraft.trim()) return;
-                  try {
-                    await updateUsername({
-                      userId: user.id,
-                      username: nameDraft,
-                    });
+                    if (!user || !nameDraft.trim()) return;
+                    await updateUsername({ userId: user.id, username: nameDraft });
                     setShowNameModal(false);
-                  } catch (e: unknown) {
-                    const msg =
-                      e instanceof Error ? e.message : 'Could not update name.';
-                    Alert.alert('Error', msg);
-                  }
                 }}
-                disabled={nameUpdating || !nameDraft.trim()}
               >
-                {nameUpdating ? (
-                  <ActivityIndicator color="#000" size="small" />
-                ) : (
-                  <Text style={styles.modalBtnPrimaryText}>Save</Text>
-                )}
+                <Text style={styles.saveText}>{nameUpdating ? '...' : 'CONFIRM'}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex:            1,
-    backgroundColor: COLORS.background,
-  },
-  contentContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        60,
-    paddingBottom:     40,
-  },
-  avatarSection: {
-    alignItems:   'center',
-    marginBottom: SPACING.lg,
-    gap:          SPACING.sm,
-  },
-  avatar: {
-    width:           72,
-    height:          72,
-    borderRadius:    36,
-    backgroundColor: COLORS.gold,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    SPACING.sm,
-  },
-  avatarText: {
-    fontFamily: FONTS.heading,
-    fontSize:   28,
-    color:      '#000000',
-  },
-  username: {
-    fontFamily:    FONTS.bodyBold,
-    fontSize:      20,
-    color:         COLORS.textPrimary,
-    textAlign:     'center',
-  },
-  editNameHint: {
-    fontFamily: FONTS.body,
-    fontSize:   11,
-    color:      COLORS.textSecondary,
-    marginTop:  4,
-    textAlign:  'center',
-  },
-  className: {
-    fontFamily: FONTS.body,
-    fontSize:   14,
-    color:      COLORS.gold,
-  },
-  joinedText: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
-  },
-  divider: {
-    height:          1,
-    backgroundColor: COLORS.border,
-    marginVertical:  SPACING.lg,
-  },
-  sectionTitle: {
-    fontFamily:    FONTS.heading,
-    fontSize:      14,
-    color:         COLORS.textSecondary,
-    letterSpacing: 2,
-    marginBottom:  SPACING.md,
-  },
-  section: {
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.lg,
-    overflow:        'hidden',
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-  },
-  accountRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    padding:           SPACING.md,
-    gap:               SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  accountLogo: {
-    width:          40,
-    height:         40,
-    borderRadius:   20,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  accountLogoText: {
-    fontFamily: FONTS.heading,
-    fontSize:   18,
-    color:      '#FFFFFF',
-  },
-  accountLogoImage: {
-    width: 24,
-    height: 24,
-  },
-  accountInfo: {
-    flex: 1,
-  },
-  accountName: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.textPrimary,
-  },
-  accountStatus: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
-  },
-  actionBtn: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical:   SPACING.xs,
-    borderRadius:      BORDER_RADIUS.sm,
-    borderWidth:       1,
-    borderColor:       COLORS.gold,
-    minWidth:          70,
-    alignItems:        'center',
-  },
-  actionBtnConnected: {
-    borderColor: COLORS.success,
-  },
-  actionBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   12,
-    color:      COLORS.gold,
-  },
-  actionBtnTextConnected: {
-    color: COLORS.success,
-  },
-  settingsRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    padding:           SPACING.md,
-    gap:               SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  settingsIcon: {
-    fontSize: 18,
-  },
-  settingsLabelCol: {
-    flex: 1,
-    gap: 2,
-  },
-  settingsLabel: {
-    fontFamily: FONTS.body,
-    fontSize:   15,
-    color:      COLORS.textPrimary,
-  },
-  settingsSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
-  },
-  settingsChevron: {
-    fontFamily: FONTS.body,
-    fontSize:   20,
-    color:      COLORS.textSecondary,
-  },
-  logoutBtn: {
-    alignItems:      'center',
-    paddingVertical: SPACING.md,
-  },
-  logoutText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   15,
-    color:      COLORS.error,
-  },
-  modalOverlay: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent:  'center',
-    paddingHorizontal: SPACING.xl,
-  },
-  modalCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.lg,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-    padding:         SPACING.lg,
-    gap:             SPACING.md,
-  },
-  modalTitle: {
-    fontFamily: FONTS.heading,
-    fontSize:   20,
-    color:      COLORS.gold,
-  },
-  modalInput: {
-    backgroundColor: COLORS.background,
-    borderRadius:    BORDER_RADIUS.md,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-    paddingHorizontal: SPACING.md,
-    height:          48,
-    color:           COLORS.textPrimary,
-    fontFamily:      FONTS.body,
-    fontSize:        16,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap:            SPACING.md,
-    marginTop:      SPACING.sm,
-  },
-  modalBtnGhost: {
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-  },
-  modalBtnGhostText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-  },
-  modalBtnPrimary: {
-    backgroundColor: COLORS.gold,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
-    minWidth: 88,
+  safeArea: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1 },
+  contentContainer: { padding: SPACING.lg, paddingBottom: 50 },
+  pageTitle: { fontFamily: FONTS.heading, fontSize: 14, color: COLORS.gold, letterSpacing: 4, textAlign: 'center', marginBottom: 30, opacity: 0.6 },
+  identityCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 24,
+    padding: 30,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 35,
+  },
+  avatarGlow: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.gold,
     justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+    elevation: 10,
+    shadowColor: COLORS.gold,
+    shadowOpacity: 0.5,
+    shadowRadius: 15,
   },
-  modalBtnPrimaryText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      '#000000',
+  avatarText: { fontFamily: FONTS.heading, fontSize: 32, color: '#000' },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
+  editLogo: {
+    width: 20,
+    height: 20,
+    tintColor: COLORS.gold, // Optional: makes the logo match the gold theme
+  },
+  username: { fontFamily: FONTS.heading, fontSize: 24, color: '#FFF', letterSpacing: 1 },
+  classTier: { fontFamily: FONTS.bodyBold, fontSize: 12, color: COLORS.gold, marginTop: 5, opacity: 0.8 },
+  sectionHeader: { fontFamily: FONTS.heading, fontSize: 12, color: 'rgba(255,255,255,0.4)', letterSpacing: 2, marginBottom: 15, marginLeft: 5 },
+  linkList: { gap: 12, marginBottom: 35 },
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  linkIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  linkIconText: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
+  linkInfo: { flex: 1 },
+  linkTitle: { fontFamily: FONTS.bodyBold, fontSize: 14, color: '#FFF' },
+  linkStatus: { fontFamily: FONTS.body, fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 },
+  linkAction: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: COLORS.gold },
+  linkActionActive: { borderColor: '#00E6FF' },
+  linkActionText: { fontFamily: FONTS.heading, fontSize: 10, color: COLORS.gold },
+  settingsGroup: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, overflow: 'hidden', marginBottom: 40 },
+  settingItem: { flexDirection: 'row', alignItems: 'center', padding: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  settingIcon: { fontSize: 18, marginRight: 15 },
+  settingLabel: { flex: 1, fontFamily: FONTS.body, fontSize: 15, color: 'rgba(255,255,255,0.8)' },
+  settingChevron: { color: 'rgba(255,255,255,0.3)', fontSize: 20 },
+  logoutBtn: { alignItems: 'center', padding: 20 },
+  logoutText: { fontFamily: FONTS.heading, fontSize: 14, color: '#FF4B4B', letterSpacing: 2 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', padding: 25 },
+  modalContent: { backgroundColor: '#1A1A1A', padding: 30, borderRadius: 24, borderWidth: 1, borderColor: COLORS.gold },
+  modalTitle: { fontFamily: FONTS.heading, fontSize: 18, color: COLORS.gold, marginBottom: 20, textAlign: 'center' },
+  modalInput: { backgroundColor: '#000', color: '#FFF', padding: 15, borderRadius: 12, fontFamily: FONTS.body, fontSize: 18, marginBottom: 25 },
+  modalButtons: { flexDirection: 'row', justifyContent: 'space-between' },
+  cancelText: { fontFamily: FONTS.heading, color: 'rgba(255,255,255,0.4)' },
+  saveText: { fontFamily: FONTS.heading, color: COLORS.gold },
 });

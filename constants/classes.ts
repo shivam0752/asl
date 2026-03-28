@@ -1,21 +1,48 @@
 import type { ClassArchetype, Tier } from '../types'
 
-export const CLASS_NAMES: Record<ClassArchetype, Record<Tier, string>> = {
-  Grinder: { Basic: 'The Striver', Intermediate: 'The Relentless' },
-  Ironclad: { Basic: 'The Enduring', Intermediate: 'The Unbroken' },
-  Ascendant: { Basic: 'The Balanced', Intermediate: 'The Aligned' },
-  Tactician: { Basic: 'The Shrewd', Intermediate: 'The Architect' },
-  Drifter: { Basic: 'The Wanderer', Intermediate: 'The Untethered' },
-  Sage: { Basic: 'The Knowing', Intermediate: 'The Deepened' },
+// Supporting the new Tier logic for the Evolution Tree
+export type ALSTier = Tier | 'Elite';
+
+export const CLASS_NAMES: Record<ClassArchetype, Record<ALSTier, string>> = {
+  Grinder: { 
+    Basic: 'The Professional', 
+    Intermediate: 'The High-Roller', 
+    Elite: 'The Power-User' 
+  },
+  Ironclad: { 
+    Basic: 'The Disciplined', 
+    Intermediate: 'The Tank', 
+    Elite: 'The Absolute' 
+  },
+  Ascendant: { 
+    Basic: 'The Polymath', 
+    Intermediate: 'The Zenith', 
+    Elite: 'The Omniscient' 
+  },
+  Tactician: { 
+    Basic: 'The Analyst', 
+    Intermediate: 'The Strategist', 
+    Elite: 'The Mastermind' 
+  },
+  Drifter: { 
+    Basic: 'The Agile', 
+    Intermediate: 'The Nomad', 
+    Elite: 'The Ghost Protocol' 
+  },
+  Sage: { 
+    Basic: 'The Specialist', 
+    Intermediate: 'The Director', 
+    Elite: 'The Authority' 
+  },
 }
 
 export const CLASS_DESCRIPTIONS: Record<ClassArchetype, string> = {
-  Grinder: 'Driven by ambition and knowledge, you climb faster than anyone around you.',
-  Ironclad: 'Your body is your foundation — consistency and discipline define your path.',
-  Ascendant: 'Rare and balanced, you grow in every dimension at once.',
-  Tactician: 'Sharp mind, strong network — you win through strategy and influence.',
-  Drifter: 'Adaptable and fast-moving, you thrive on change and momentum.',
-  Sage: 'Years of deep experience have made you a quiet force others look to for guidance.',
+  Grinder: 'Optimized for career trajectory and high-stakes industry dominance.',
+  Ironclad: 'Engineered for physical resilience and unwavering consistency.',
+  Ascendant: 'A rare hybrid build balancing cognitive depth with physical peak.',
+  Tactician: 'Specialized in social engineering, strategic networking, and influence.',
+  Drifter: 'High-mobility unit focused on rapid adaptation and project fluidity.',
+  Sage: 'The ultimate knowledge repository; focuses on deep-work and systemic mastery.',
 }
 
 export const CLASS_COLORS: Record<ClassArchetype, string> = {
@@ -27,8 +54,13 @@ export const CLASS_COLORS: Record<ClassArchetype, string> = {
   Sage: '#4ADE80',
 }
 
-export function getClassName(archetype: ClassArchetype, tier: Tier): string {
-  return CLASS_NAMES[archetype][tier]
+/**
+ * Enhanced helper to handle the 3-Tier branching logic
+ */
+export function getClassName(archetype: ClassArchetype, tier: ALSTier): string {
+  // Fallback to Basic if tier is undefined
+  const selectedTier = tier || 'Basic';
+  return CLASS_NAMES[archetype][selectedTier];
 }
 
 export function getClassDescription(archetype: ClassArchetype): string {

@@ -1,200 +1,175 @@
-import { useMemo } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import type { DimensionValue } from 'react-native'
-import type { StatName } from '../../types'
-import { BORDER_RADIUS, COLORS, FONTS, STAT_COLORS, SPACING } from '../../constants/theme'
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, Animated, Easing, Platform } from 'react-native';
+import type { StatName } from '../../types';
+import { BORDER_RADIUS, COLORS, FONTS, STAT_COLORS, SPACING } from '../../constants/theme';
 
 export type StatBarProps = {
-  statName: StatName
-  value: number
-  showValue?: boolean
-}
-
-function getStatLabelStyle(statName: StatName) {
-  switch (statName) {
-    case 'STR':
-      return styles.statLabelSTR
-    case 'INT':
-      return styles.statLabelINT
-    case 'WIS':
-      return styles.statLabelWIS
-    case 'VIT':
-      return styles.statLabelVIT
-    case 'CHA':
-      return styles.statLabelCHA
-    case 'AGI':
-      return styles.statLabelAGI
-  }
-}
-
-function getStatFillStyle(statName: StatName) {
-  switch (statName) {
-    case 'STR':
-      return styles.statFillSTR
-    case 'INT':
-      return styles.statFillINT
-    case 'WIS':
-      return styles.statFillWIS
-    case 'VIT':
-      return styles.statFillVIT
-    case 'CHA':
-      return styles.statFillCHA
-    case 'AGI':
-      return styles.statFillAGI
-  }
-}
+  statName: StatName;
+  value: number;
+  showValue?: boolean;
+};
 
 export default function StatBar({ statName, value, showValue = true }: StatBarProps) {
-  // Presentation-only guard; core stat math stays in utils.
-  const normalized = Math.max(0, Math.min(100, value))
-  const fillWidth = (`${normalized}%` as unknown) as DimensionValue
+  // Start at 0 for the "Power Up" animation effect on mount
+  const animatedWidth = useRef(new Animated.Value(0)).current;
+  const normalizedValue = Math.max(0, Math.min(100, value));
 
-  const dynamicWidthStyle = useMemo(
-    () =>
-      StyleSheet.create({
-        width: { width: fillWidth },
-      }),
-    [fillWidth]
-  )
+  useEffect(() => {
+    // FIX: Removed the .current from the end of .start()
+    Animated.timing(animatedWidth, {
+      toValue: normalizedValue,
+      duration: 1200,
+      easing: Easing.out(Easing.exp),
+      useNativeDriver: false,
+    }).start();
+  }, [value]);
 
-  const labelStyle = getStatLabelStyle(statName)
-  const fillStyle = getStatFillStyle(statName)
+  const widthInterpolation = animatedWidth.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+  });
+
+  const statColor = STAT_COLORS[statName] || COLORS.gold;
 
   return (
     <View style={styles.card}>
+      {/* Decorative RPG Speed Lines */}
       <View style={styles.speedLines} pointerEvents="none">
-        <View style={styles.speedLineA} />
-        <View style={styles.speedLineB} />
-        <View style={styles.speedLineC} />
+        <View style={[styles.speedLineA, { backgroundColor: statColor }]} />
+        <View style={[styles.speedLineB, { backgroundColor: statColor }]} />
       </View>
 
       <View style={styles.headerRow}>
-        <Text style={[styles.statLabelBase, labelStyle]}>{statName}</Text>
-        {showValue ? <Text style={styles.valueText}>{Math.round(normalized)}</Text> : null}
+        <View style={styles.labelContainer}>
+          <View style={[styles.typeIndicator, { backgroundColor: statColor }]} />
+          <Text style={[styles.statLabel, { color: statColor }]}>{statName}</Text>
+        </View>
+        
+        {showValue && (
+          <View style={styles.valueBadge}>
+            <Text style={styles.valueText}>{Math.round(normalizedValue)}</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.barOuter}>
-        <View style={[styles.barFillBase, fillStyle, dynamicWidthStyle.width]} />
-        <View style={styles.barGlow} />
+      <View style={styles.barContainer}>
+        <View style={styles.barTrack}>
+          <Animated.View 
+            style={[
+              styles.barFill, 
+              { 
+                width: widthInterpolation, 
+                backgroundColor: statColor,
+              }
+            ]} 
+          />
+          {/* Subtle highlight for a metallic/glass look */}
+          <View style={styles.innerGlow} />
+        </View>
       </View>
     </View>
-  )
+  );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.gold,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     overflow: 'hidden',
     position: 'relative',
+    ...Platform.select({
+      android: { elevation: 2 },
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 4,
+      }
+    })
   },
-
-  // Manga speed lines
-  speedLines: {
-    position: 'absolute',
-    top: -20,
-    right: -22,
-    width: 120,
-    height: 60,
-    opacity: 0.18,
-  },
-  speedLineBase: {
-    position: 'absolute',
-    height: 2,
-    backgroundColor: COLORS.gold,
-    borderRadius: 2,
-  },
-  speedLineA: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    width: 88,
-    height: 2,
-    backgroundColor: COLORS.gold,
-    borderRadius: 2,
-    transform: [{ rotate: '-18deg' }],
-  },
-  speedLineB: {
-    position: 'absolute',
-    top: 26,
-    left: 2,
-    width: 96,
-    height: 2,
-    backgroundColor: COLORS.gold,
-    borderRadius: 2,
-    transform: [{ rotate: '10deg' }],
-  },
-  speedLineC: {
-    position: 'absolute',
-    top: 40,
-    left: 18,
-    width: 70,
-    height: 2,
-    backgroundColor: COLORS.gold,
-    borderRadius: 2,
-    transform: [{ rotate: '28deg' }],
-  },
-
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
+    marginBottom: 10,
   },
-
-  statLabelBase: {
-    fontFamily: FONTS.bodyBold,
+  labelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typeIndicator: {
+    width: 3,
+    height: 14,
+    borderRadius: 2,
+  },
+  statLabel: {
+    fontFamily: FONTS.heading,
     fontSize: 14,
-    letterSpacing: 0.6,
+    letterSpacing: 1.5,
   },
-  statLabelSTR: { color: STAT_COLORS.STR },
-  statLabelINT: { color: STAT_COLORS.INT },
-  statLabelWIS: { color: STAT_COLORS.WIS },
-  statLabelVIT: { color: STAT_COLORS.VIT },
-  statLabelCHA: { color: STAT_COLORS.CHA },
-  statLabelAGI: { color: STAT_COLORS.AGI },
-
+  valueBadge: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
   valueText: {
     fontFamily: FONTS.bodyBold,
-    fontSize: 14,
-    color: COLORS.textPrimary,
+    fontSize: 13,
+    color: '#FFF',
   },
-
-  barOuter: {
-    height: 12,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.background,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+  barContainer: {
+    width: '100%',
+  },
+  barTrack: {
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 10,
     overflow: 'hidden',
     justifyContent: 'center',
   },
-
-  barFillBase: {
+  barFill: {
     height: '100%',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 10,
   },
-
-  statFillSTR: { backgroundColor: STAT_COLORS.STR },
-  statFillINT: { backgroundColor: STAT_COLORS.INT },
-  statFillWIS: { backgroundColor: STAT_COLORS.WIS },
-  statFillVIT: { backgroundColor: STAT_COLORS.VIT },
-  statFillCHA: { backgroundColor: STAT_COLORS.CHA },
-  statFillAGI: { backgroundColor: STAT_COLORS.AGI },
-
-  barGlow: {
+  innerGlow: {
     position: 'absolute',
-    left: 0,
-    right: 0,
     top: 1,
-    height: 4,
-    backgroundColor: COLORS.gold,
-    opacity: 0.12,
-    borderRadius: BORDER_RADIUS.full,
+    left: 4,
+    right: 4,
+    height: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 10,
   },
-})
-
+  speedLines: {
+    position: 'absolute',
+    right: -10,
+    top: -5,
+    width: 80,
+    height: 30,
+    opacity: 0.15,
+  },
+  speedLineA: {
+    position: 'absolute',
+    top: 10,
+    right: 0,
+    width: 50,
+    height: 1,
+    transform: [{ rotate: '-12deg' }],
+  },
+  speedLineB: {
+    position: 'absolute',
+    top: 20,
+    right: 5,
+    width: 35,
+    height: 1,
+    transform: [{ rotate: '-8deg' }],
+  },
+});

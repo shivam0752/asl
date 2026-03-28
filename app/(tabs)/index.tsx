@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   View,
   Text,
@@ -5,6 +6,8 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  SafeAreaView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,407 +24,367 @@ import { StatName } from '../../types';
 const STAT_ORDER: StatName[] = ['STR', 'INT', 'WIS', 'VIT', 'CHA', 'AGI'];
 
 export default function Home() {
-  const router                          = useRouter();
-  const { user }                        = useAuth();
-  const { profile }                     = useProfile(user?.id);
-  const { character, stats, loading }   = useCharacter(user?.id);
-  const { events }                      = useXPEvents(user?.id);
-  const { syncing, lastSyncResult }     = useSync(user?.id);
+  const router = useRouter();
+  const { user } = useAuth();
+  const { profile } = useProfile(user?.id);
+  const { character, stats, loading } = useCharacter(user?.id);
+  const { events } = useXPEvents(user?.id);
+  const { syncing, lastSyncResult } = useSync(user?.id);
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={COLORS.gold} size="large" />
-        <Text style={styles.loadingText}>Summoning your character...</Text>
+        <Text style={styles.loadingText}>SUMMONING CHARACTER...</Text>
       </View>
     );
   }
 
   if (!character) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.noCharEmoji}>⚔️</Text>
-        <Text style={styles.noCharTitle}>No character yet</Text>
-        <Text style={styles.noCharSubtitle}>
-          Complete setup to build your character
-        </Text>
-        <TouchableOpacity
-          style={styles.ctaButton}
-          onPress={() => router.replace('/(onboarding)/connect-linkedin')}
-        >
-          <Text style={styles.ctaButtonText}>BUILD MY CHARACTER</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.noCharContainer}>
+          <Text style={styles.noCharEmoji}>⚔️</Text>
+          <Text style={styles.noCharTitle}>AWAKENING NEEDED</Text>
+          <Text style={styles.noCharSubtitle}>
+            Your legend hasn't started yet. Connect your digital footprint to manifest your stats.
+          </Text>
+          <TouchableOpacity
+            style={styles.mainCta}
+            onPress={() => router.replace('/(onboarding)/connect-linkedin')}
+          >
+            <Text style={styles.mainCtaText}>INITIALIZE SYSTEM</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
-  const level         = character.level;
-  const totalXp       = character.totalXp;
-  const percent       = xpProgressPercent(totalXp);
-  const toNext        = xpToNextLevel(totalXp);
-  const className     = getClassName(character.class, character.tier);
-  const recentEvents  = events.slice(0, 5);
+  const level = character.level;
+  const totalXp = character.totalXp;
+  const percent = xpProgressPercent(totalXp);
+  const toNext = xpToNextLevel(totalXp);
+  const className = getClassName(character.class, character.tier);
+  const recentEvents = events.slice(0, 4);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Welcome back</Text>
-          <Text style={styles.username}>
-            {profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero'}
-          </Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* MOBILE HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.greeting}>SYSTEM ACTIVE</Text>
+            <Text style={styles.username}>
+              {profile?.username?.trim() || user?.email?.split('@')[0] || 'Hero'}
+            </Text>
+          </View>
+          <View style={styles.levelHexagon}>
+            <Text style={styles.levelLabel}>LVL</Text>
+            <Text style={styles.levelNumber}>{level}</Text>
+          </View>
         </View>
-        <View style={styles.levelBadge}>
-          <Text style={styles.levelBadgeText}>LVL {level}</Text>
-        </View>
-      </View>
 
-      {/* Class name */}
-      <Text style={styles.className}>{className}</Text>
-
-      {/* XP Bar */}
-      <View style={styles.xpContainer}>
-        <View style={styles.xpLabels}>
-          <Text style={styles.xpLabel}>XP Progress</Text>
-          <Text style={styles.xpValue}>
-            {toNext} to next level
-          </Text>
-        </View>
-        <View style={styles.xpBarBg}>
-          <View style={[styles.xpBarFill, { width: `${percent}%` }]} />
-        </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* Stats at a glance */}
-      <Text style={styles.sectionTitle}>STATS AT A GLANCE</Text>
-      <View style={styles.statsGrid}>
-        {STAT_ORDER.map((statName) => {
-          const stat  = stats.find((s) => s.statName === statName);
-          const value = stat
-            ? calculateTotalStat(stat.baseScore, stat.activeScore)
-            : 0;
-          const color = STAT_COLORS[statName];
-          return (
-            <View key={statName} style={styles.statChip}>
-              <View style={[styles.statDot, { backgroundColor: color }]} />
-              <Text style={styles.statChipName}>{statName}</Text>
-              <Text style={[styles.statChipValue, { color }]}>{value}</Text>
+        {/* CHARACTER CARD */}
+        <View style={styles.heroCard}>
+          <Text style={styles.heroClass}>{className.toUpperCase()}</Text>
+          
+          <View style={styles.xpSection}>
+            <View style={styles.xpHeader}>
+              <Text style={styles.xpTitle}>EXPERIENCE POINTS</Text>
+              <Text style={styles.xpValue}>{toNext} XP TO NEXT LVL</Text>
             </View>
-          );
-        })}
-      </View>
+            <View style={styles.xpBarTrack}>
+              <View style={[styles.xpBarFill, { width: `${percent}%` }]} />
+            </View>
+          </View>
+        </View>
 
-      <View style={styles.divider} />
+        {/* STATS GRID - 2 COLUMNS */}
+        <Text style={styles.sectionHeader}>CORE STATISTICS</Text>
+        <View style={styles.statsGrid}>
+          {STAT_ORDER.map((statName) => {
+            const stat = stats.find((s) => s.statName === statName);
+            const value = stat ? calculateTotalStat(stat.baseScore, stat.activeScore) : 0;
+            const color = STAT_COLORS[statName];
+            return (
+              <TouchableOpacity 
+                key={statName} 
+                style={styles.statBox}
+                onPress={() => router.push('/(tabs)/character')}
+              >
+                <View style={[styles.statIndicator, { backgroundColor: color }]} />
+                <View>
+                  <Text style={styles.statName}>{statName}</Text>
+                  <Text style={[styles.statValue, { color }]}>{value}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      {/* Recent Activity */}
-      <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
-      {recentEvents.length === 0 ? (
-        <View style={styles.emptyActivity}>
-          <Text style={styles.emptyActivityText}>No activity yet</Text>
-          <Text style={styles.emptyActivitySub}>
-            Connect LinkedIn or Google Fit to start earning XP
-          </Text>
-          <TouchableOpacity
-            style={styles.connectBtn}
-            onPress={() => router.push('/(tabs)/profile')}
-          >
-            <Text style={styles.connectBtnText}>Connect accounts →</Text>
+        {/* RECENT LOGS */}
+        <View style={styles.activityHeader}>
+          <Text style={styles.sectionHeader}>RECENT LOGS</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/progress')}>
+            <Text style={styles.viewAll}>VIEW ALL</Text>
           </TouchableOpacity>
         </View>
-      ) : (
-        recentEvents.map((event) => {
-          const color = event.statAffected
-            ? STAT_COLORS[event.statAffected as StatName]
-            : COLORS.gold;
-          return (
-            <View
-              key={event.id}
-              style={[styles.activityCard, { borderLeftColor: color }]}
-            >
-              <Text style={styles.activityIcon}>
-                {event.eventType === 'career' ? '💼' : '⚡'}
-              </Text>
-              <View style={styles.activityCenter}>
-                <Text style={styles.activityName}>{event.eventName}</Text>
-                {event.statAffected && (
-                  <View
-                    style={[
-                      styles.statBadge,
-                      { backgroundColor: color + '22' },
-                    ]}
-                  >
-                    <Text style={[styles.statBadgeText, { color }]}>
-                      {event.statAffected} +{event.statDelta}
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <View style={styles.activityRight}>
-                <Text style={styles.activityXP}>+{event.xpGained} XP</Text>
-              </View>
-            </View>
-          );
-        })
-      )}
 
-      {/* Sync status */}
-      <Text style={styles.syncStatus}>
-        {syncing
-          ? '⟳ Syncing your data...'
-          : lastSyncResult
-          ? `✓ ${lastSyncResult}`
-          : 'Auto-syncs daily when accounts are connected'}
-      </Text>
-    </ScrollView>
+        {recentEvents.length === 0 ? (
+          <View style={styles.emptyActivityBox}>
+            <Text style={styles.emptyText}>No data streams detected.</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/profile')}>
+              <Text style={styles.linkText}>Link Accounts</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          recentEvents.map((event) => (
+            <View key={event.id} style={styles.logCard}>
+              <View style={styles.logIconBox}>
+                <Text style={styles.logEmoji}>{event.eventType === 'career' ? '💼' : '⚡'}</Text>
+              </View>
+              <View style={styles.logMain}>
+                <Text style={styles.logTitle} numberOfLines={1}>{event.eventName}</Text>
+                <Text style={styles.logSubtext}>{event.statAffected} +{event.statDelta}</Text>
+              </View>
+              <Text style={styles.logXP}>+{event.xpGained} XP</Text>
+            </View>
+          ))
+        )}
+
+        {/* SYNC FOOTER */}
+        <View style={styles.footer}>
+          <Text style={styles.syncText}>
+            {syncing ? '⟳ NEURAL SYNC IN PROGRESS...' : `LAST SYNC: ${lastSyncResult || 'READY'}`}
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+  },
   container: {
-    flex:            1,
-    backgroundColor: COLORS.background,
+    flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        60,
-    paddingBottom:     40,
+    padding: SPACING.lg,
+    paddingTop: Platform.OS === 'android' ? 40 : 10,
+    paddingBottom: 100,
   },
   loadingContainer: {
-    flex:            1,
-    backgroundColor: COLORS.background,
-    alignItems:      'center',
-    justifyContent:  'center',
-    gap:             SPACING.md,
-    paddingHorizontal: SPACING.xl,
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingText: {
-    fontFamily: FONTS.body,
-    color:      COLORS.textSecondary,
-    fontSize:   15,
-  },
-  noCharEmoji: {
-    fontSize:     64,
-    marginBottom: SPACING.sm,
-  },
-  noCharTitle: {
-    fontFamily:    FONTS.heading,
-    fontSize:      28,
-    color:         COLORS.textPrimary,
-    letterSpacing: 1,
-  },
-  noCharSubtitle: {
-    fontFamily: FONTS.body,
-    fontSize:   14,
-    color:      COLORS.textSecondary,
-    textAlign:  'center',
-  },
-  ctaButton: {
-    backgroundColor: COLORS.gold,
-    height:          52,
-    borderRadius:    BORDER_RADIUS.md,
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingHorizontal: SPACING.xl,
-    marginTop:       SPACING.md,
-  },
-  ctaButtonText: {
-    fontFamily:    FONTS.heading,
-    fontSize:      18,
-    color:         '#000000',
+    fontFamily: FONTS.heading,
+    color: COLORS.gold,
+    marginTop: 20,
     letterSpacing: 2,
   },
   header: {
-    flexDirection:  'row',
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems:     'flex-start',
-    marginBottom:   SPACING.xs,
+    alignItems: 'center',
+    marginBottom: 25,
   },
   greeting: {
     fontFamily: FONTS.body,
-    fontSize:   14,
-    color:      COLORS.textSecondary,
+    fontSize: 10,
+    color: COLORS.gold,
+    letterSpacing: 2,
   },
   username: {
-    fontFamily:    FONTS.bodyBold,
-    fontSize:      22,
-    color:         COLORS.textPrimary,
-    textTransform: 'capitalize',
-  },
-  levelBadge: {
-    borderWidth:       1,
-    borderColor:       COLORS.gold,
-    borderRadius:      BORDER_RADIUS.full,
-    paddingHorizontal: SPACING.md,
-    paddingVertical:   6,
-  },
-  levelBadgeText: {
-    fontFamily:    FONTS.heading,
-    fontSize:      16,
-    color:         COLORS.gold,
-    letterSpacing: 1,
-  },
-  className: {
-    fontFamily:    FONTS.heading,
-    fontSize:      20,
-    color:         COLORS.gold,
-    letterSpacing: 1,
-    marginBottom:  SPACING.lg,
-  },
-  xpContainer: {
-    marginBottom: SPACING.lg,
-  },
-  xpLabels: {
-    flexDirection:  'row',
-    justifyContent: 'space-between',
-    marginBottom:   SPACING.sm,
-  },
-  xpLabel: {
-    fontFamily:    FONTS.bodyBold,
-    fontSize:      12,
-    color:         COLORS.textSecondary,
+    fontFamily: FONTS.heading,
+    fontSize: 26,
+    color: '#FFF',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+  },
+  levelHexagon: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    padding: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    minWidth: 65,
+  },
+  levelLabel: {
+    fontFamily: FONTS.body,
+    fontSize: 9,
+    color: COLORS.gold,
+  },
+  levelNumber: {
+    fontFamily: FONTS.heading,
+    fontSize: 20,
+    color: COLORS.gold,
+  },
+  heroCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 30,
+  },
+  heroClass: {
+    fontFamily: FONTS.heading,
+    fontSize: 22,
+    color: COLORS.gold,
+    textAlign: 'center',
+    marginBottom: 15,
+    letterSpacing: 4,
+  },
+  xpSection: {
+    width: '100%',
+  },
+  xpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  xpTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.4)',
   },
   xpValue: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: COLORS.gold,
   },
-  xpBarBg: {
-    height:          10,
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.full,
-    overflow:        'hidden',
-    borderWidth:     1,
-    borderColor:     COLORS.gold + '44',
+  xpBarTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
   xpBarFill: {
-    height:          '100%',
+    height: '100%',
     backgroundColor: COLORS.gold,
-    borderRadius:    BORDER_RADIUS.full,
   },
-  divider: {
-    height:          1,
-    backgroundColor: COLORS.border,
-    marginBottom:    SPACING.lg,
-  },
-  sectionTitle: {
-    fontFamily:    FONTS.heading,
-    fontSize:      18,
-    color:         COLORS.textPrimary,
+  sectionHeader: {
+    fontFamily: FONTS.heading,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.5)',
     letterSpacing: 2,
-    marginBottom:  SPACING.md,
+    marginBottom: 15,
   },
   statsGrid: {
     flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           SPACING.sm,
-    marginBottom:  SPACING.lg,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 30,
   },
-  statChip: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             6,
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-    minWidth:        '30%',
+  statBox: {
+    width: '48%',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 16,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
   },
-  statDot: {
-    width:        8,
-    height:       8,
-    borderRadius: 4,
+  statIndicator: {
+    width: 3,
+    height: 25,
+    borderRadius: 2,
   },
-  statChipName: {
+  statName: {
     fontFamily: FONTS.bodyBold,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.6)',
   },
-  statChipValue: {
-    fontFamily:  FONTS.heading,
-    fontSize:    16,
-    marginLeft:  'auto',
-  },
-  emptyActivity: {
-    alignItems:    'center',
-    paddingVertical: SPACING.xl,
-    gap:           SPACING.sm,
-  },
-  emptyActivityText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   15,
-    color:      COLORS.textSecondary,
-  },
-  emptyActivitySub: {
-    fontFamily: FONTS.body,
-    fontSize:   13,
-    color:      COLORS.textSecondary,
-    textAlign:  'center',
-    lineHeight: 20,
-  },
-  connectBtn: {
-    marginTop: SPACING.sm,
-  },
-  connectBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.gold,
-  },
-  activityCard: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.md,
-    padding:         SPACING.md,
-    marginBottom:    SPACING.sm,
-    borderLeftWidth: 3,
-    gap:             SPACING.sm,
-  },
-  activityIcon: {
-    fontSize: 20,
-  },
-  activityCenter: {
-    flex: 1,
-    gap:  4,
-  },
-  activityName: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.textPrimary,
-  },
-  statBadge: {
-    alignSelf:         'flex-start',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical:   2,
-    borderRadius:      BORDER_RADIUS.sm,
-  },
-  statBadgeText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   11,
-  },
-  activityRight: {
-    alignItems: 'flex-end',
-  },
-  activityXP: {
+  statValue: {
     fontFamily: FONTS.heading,
-    fontSize:   16,
-    color:      COLORS.gold,
+    fontSize: 18,
   },
-  syncStatus: {
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewAll: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 12,
+    color: COLORS.gold,
+    marginBottom: 15,
+  },
+  logCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  logIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  logEmoji: {
+    fontSize: 18,
+  },
+  logMain: {
+    flex: 1,
+  },
+  logTitle: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 14,
+    color: '#FFF',
+  },
+  logSubtext: {
     fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
-    textAlign:  'center',
-    marginTop:  SPACING.lg,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
   },
+  logXP: {
+    fontFamily: FONTS.heading,
+    fontSize: 14,
+    color: COLORS.gold,
+  },
+  footer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  syncText: {
+    fontFamily: FONTS.body,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: 1,
+  },
+  noCharContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+  },
+  noCharEmoji: { fontSize: 60, marginBottom: 20 },
+  noCharTitle: { fontFamily: FONTS.heading, fontSize: 24, color: '#FFF', textAlign: 'center' },
+  noCharSubtitle: { fontFamily: FONTS.body, fontSize: 14, color: 'rgba(255,255,255,0.5)', textAlign: 'center', marginTop: 10 },
+  mainCta: { backgroundColor: COLORS.gold, paddingHorizontal: 30, paddingVertical: 15, borderRadius: 12, marginTop: 30 },
+  mainCtaText: { fontFamily: FONTS.heading, fontSize: 16, color: '#000' },
+  emptyActivityBox: { padding: 20, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 16 },
+  emptyText: { fontFamily: FONTS.body, color: 'rgba(255,255,255,0.4)', fontSize: 13 },
+  linkText: { fontFamily: FONTS.bodyBold, color: COLORS.gold, fontSize: 13, marginTop: 5 },
 });

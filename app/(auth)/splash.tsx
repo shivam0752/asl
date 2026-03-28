@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Animated, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../hooks/useAuth';
@@ -11,7 +11,6 @@ export default function Splash() {
   const router = useRouter();
   const { user } = useAuth();
   const floatAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0.85)).current;
 
   useEffect(() => {
     if (user) router.replace('/(tabs)/');
@@ -20,100 +19,43 @@ export default function Splash() {
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.parallel([
-          Animated.timing(floatAnim, {
-            toValue: -10,
-            duration: 1800,
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 1800,
-            useNativeDriver: false,
-          }),
-        ]),
-        Animated.parallel([
-          Animated.timing(floatAnim, {
-            toValue: 0,
-            duration: 1800,
-            useNativeDriver: false,
-          }),
-          Animated.timing(glowAnim, {
-            toValue: 0.85,
-            duration: 1800,
-            useNativeDriver: false,
-          }),
-        ]),
+        Animated.timing(floatAnim, { toValue: -15, duration: 3000, useNativeDriver: true }),
+        Animated.timing(floatAnim, { toValue: 0, duration: 3000, useNativeDriver: true }),
       ])
     ).start();
-  }, [floatAnim, glowAnim]);
+  }, []);
 
   return (
     <View style={styles.container}>
-      <LinearGradient
-        colors={['#151515', '#0D0D0D', '#050505']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.bgGradient}
-      />
+      <LinearGradient colors={['#0D0D0D', '#151515', '#0D0D0D']} style={StyleSheet.absoluteFill} />
 
-      <Animated.View style={[styles.topGlow, { opacity: glowAnim }]}>
-        <LinearGradient
-          colors={['rgba(245,197,66,0.35)', 'rgba(245,197,66,0.06)', 'rgba(13,13,13,0)']}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={styles.topGlowGradient}
+      {/* CENTRAL LOGO - Larger & Centered */}
+      <View style={styles.logoBgWrapper}>
+        <Image 
+          source={require('../../assets/images/logo.png')} 
+          style={styles.largeLogo}
+          resizeMode="contain"
         />
+      </View>
+
+      {/* TEXT CONTENT - Elevated Above Logo */}
+      <Animated.View style={[styles.headerGroup, { transform: [{ translateY: floatAnim }] }]}>
+        <Text style={styles.appName}>ALS</Text>
+        <Text style={styles.fullBrand}>AETHER LEVEL SYSTEM</Text>
+        <View style={styles.accentLine} />
+        <Text style={styles.tagline}>YOUR REAL LIFE. LEVELED UP.</Text>
       </Animated.View>
 
-      {/* Speed lines decoration */}
-      {[...Array(8)].map((_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.speedLine,
-            {
-              transform: [{ rotate: `${i * 22.5}deg` }],
-              opacity: 0.06,
-            },
-          ]}
-        />
-      ))}
-
-      {/* Center content */}
-      <Animated.View style={[styles.center, { transform: [{ translateY: floatAnim }] }]}>
-        <Text style={styles.appName}>LEVELUP</Text>
-        <Text style={styles.tagline}>Your real life. Leveled up.</Text>
-      </Animated.View>
-
-      {/* Buttons */}
-      <View style={styles.buttons}>
-        <TouchableOpacity
-          style={styles.primaryButton}
-          onPress={() => router.push('/(auth)/signup')}
-        >
-          <LinearGradient
-            colors={['#F5C542', '#FFDA73']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.primaryButtonGradient}
-          >
-            <Text style={styles.primaryButtonText}>GET STARTED</Text>
+      {/* BUTTONS */}
+      <View style={styles.buttonGroup}>
+        <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push('/(auth)/signup')}>
+          <LinearGradient colors={['#F5C542', '#FFDA73']} style={styles.btnGradient}>
+            <Text style={styles.primaryBtnText}>SIGNUP</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => router.push('/(auth)/login')}
-        >
-          <LinearGradient
-            colors={['rgba(245,197,66,0.22)', 'rgba(245,197,66,0.08)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.secondaryButtonGradient}
-          >
-            <Text style={styles.secondaryButtonText}>LOG IN</Text>
-          </LinearGradient>
+        <TouchableOpacity style={styles.secondaryBtn} onPress={() => router.push('/(auth)/login')}>
+          <Text style={styles.secondaryBtnText}>LOGIN</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -121,90 +63,31 @@ export default function Splash() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+  container: { flex: 1, backgroundColor: '#0D0D0D', alignItems: 'center' },
+  logoBgWrapper: { 
+    ...StyleSheet.absoluteFillObject, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    zIndex: 1
   },
-  bgGradient: {
-    ...StyleSheet.absoluteFillObject,
+  largeLogo: { 
+    width: width * 1.3, // Increase this for even larger logo
+    height: width * 1.3,
+    opacity: 0.42, // Adjusted for visibility
   },
-  topGlow: {
-    position: 'absolute',
-    top: -40,
-    left: -40,
-    right: -40,
-    height: 260,
-    pointerEvents: 'none',
+  headerGroup: { 
+    alignItems: 'center', 
+    marginTop: height * 0.12, // High elevation
+    zIndex: 2 
   },
-  topGlowGradient: {
-    flex: 1,
-  },
-  speedLine: {
-    position: 'absolute',
-    width: 2,
-    height: height * 1.5,
-    backgroundColor: COLORS.gold,
-    top: -height * 0.25,
-    left: width / 2,
-  },
-  center: {
-    alignItems: 'center',
-    marginBottom: 80,
-  },
-  appName: {
-    fontFamily: FONTS.heading,
-    fontSize: 72,
-    color: COLORS.gold,
-    letterSpacing: 4,
-  },
-  tagline: {
-    fontFamily: FONTS.body,
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  buttons: {
-    position: 'absolute',
-    bottom: 60,
-    width: '100%',
-    paddingHorizontal: 32,
-    gap: 12,
-  },
-  primaryButton: {
-    height: 52,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  primaryButtonGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonText: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: '#000000',
-    letterSpacing: 2,
-  },
-  secondaryButton: {
-    height: 52,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: 'rgba(245,197,66,0.45)',
-  },
-  secondaryButtonGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: COLORS.gold,
-    letterSpacing: 2,
-  },
+  appName: { fontFamily: FONTS.heading, fontSize: 84, color: COLORS.gold, letterSpacing: 10, includeFontPadding: false },
+  fullBrand: { fontFamily: FONTS.bodyBold, fontSize: 12, color: 'rgba(255,255,255,0.5)', letterSpacing: 4, marginTop: -10 },
+  accentLine: { width: 40, height: 2, backgroundColor: COLORS.gold, marginVertical: 20 },
+  tagline: { fontFamily: FONTS.body, fontSize: 12, color: COLORS.gold, letterSpacing: 1 },
+  buttonGroup: { position: 'absolute', bottom: 60, width: '100%', paddingHorizontal: 40, gap: 15, zIndex: 2 },
+  primaryBtn: { height: 58, borderRadius: 12, overflow: 'hidden' },
+  btnGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  primaryBtnText: { fontFamily: FONTS.heading, fontSize: 24, color: '#000', letterSpacing: 2, paddingHorizontal: 15, includeFontPadding: false },
+  secondaryBtn: { height: 58, borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
+  secondaryBtnText: { fontFamily: FONTS.heading, fontSize: 24, color: COLORS.gold, letterSpacing: 2, paddingHorizontal: 15, includeFontPadding: false },
 });

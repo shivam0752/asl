@@ -18,16 +18,23 @@ function TabIcon({
   emoji: string;
 }) {
   return (
-    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
       {source ? (
         <Image
           source={source}
-          style={{ width: 24, height: 24, opacity: focused ? 1 : 0.5 }}
+          style={{ 
+            width: 22, // Slimmed down icon size
+            height: 22, 
+            opacity: focused ? 1 : 0.4,
+            tintColor: focused ? COLORS.gold : '#FFF' 
+          }}
           resizeMode="contain"
         />
       ) : (
-        <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
+        <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4 }}>{emoji}</Text>
       )}
+      {/* Subtle indicator dot for active tab */}
+      {focused && <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.gold, marginTop: 4, position: 'absolute', bottom: -8 }} />}
     </View>
   );
 }
@@ -36,9 +43,10 @@ export default function TabLayout() {
   const { session, loading, user } = useAuth();
   const { character } = useCharacter(user?.id);
   const router = useRouter();
+  
   const previousLevelRef = useRef<number | null>(null);
   const [showLevelUp, setShowLevelUp] = useState(false);
-  const [levelJump, setLevelJump] = useState<{ from: number; to: number } | null>(null);
+  const [currentLevel, setCurrentLevel] = useState<number>(1);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -50,7 +58,7 @@ export default function TabLayout() {
     if (!character?.level) return;
     const previousLevel = previousLevelRef.current;
     if (previousLevel !== null && character.level > previousLevel) {
-      setLevelJump({ from: previousLevel, to: character.level });
+      setCurrentLevel(character.level);
       setShowLevelUp(true);
     }
     previousLevelRef.current = character.level;
@@ -58,7 +66,7 @@ export default function TabLayout() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: COLORS.background, justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center' }}>
         <ActivityIndicator color={COLORS.gold} />
       </View>
     );
@@ -70,34 +78,29 @@ export default function TabLayout() {
         screenOptions={{
           headerShown: false,
           tabBarActiveTintColor: COLORS.gold,
-          tabBarShowLabel: false, // Hides the text completely
+          tabBarShowLabel: false,
           tabBarBackground: () => (
             <LinearGradient
-              colors={['#1A1A1A', '#0F0F0F']}
+              colors={['#1A1A1A', '#0A0A0A']}
               style={{ 
                 flex: 1, 
-                borderRadius: 30, // Rounded corners for the gradient
+                borderRadius: 25,
                 borderWidth: 1,
-                borderColor: '#333'
+                borderColor: 'rgba(255,255,255,0.08)'
               }}
             />
           ),
           tabBarStyle: {
             position: 'absolute',
-            // Lessen the width by adding horizontal margin
-            left: 20,
-            right: 20,
-            bottom: Platform.OS === 'ios' ? 20 : 5, // Float it off the bottom
-            
-            height: 44,
-            borderRadius: 30,
+            left: 30, // Increased margin to make it narrower
+            right: 30,
+            bottom: Platform.OS === 'ios' ? 30 : 15, 
+            height: 50, // SLIMMED DOWN from 60
+            borderRadius: 25,
             backgroundColor: 'transparent',
-            elevation: 5, // Shadow for Android
-            shadowColor: '#000', // Shadow for iOS
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.3,
-            shadowRadius: 10,
-            borderTopWidth: 0, // Remove default line
+            elevation: 0,
+            borderTopWidth: 0,
+            paddingBottom: 0, // Reset padding to center icons vertically
           },
         }}
       >
@@ -118,10 +121,18 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="evolution"
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon focused={focused} source={null} emoji="🧬" />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="progress"
           options={{
             tabBarIcon: ({ focused }) => (
-              <TabIcon focused={focused} source={APP_ASSETS.tabProgress} emoji="📈" />
+              <TabIcon focused={focused} source={APP_ASSETS.tabProgress} emoji="📊" />
             ),
           }}
         />
@@ -129,7 +140,7 @@ export default function TabLayout() {
           name="profile"
           options={{
             tabBarIcon: ({ focused }) => (
-              <TabIcon focused={focused} source={APP_ASSETS.tabProfile} emoji="👤" />
+              <TabIcon focused={focused} source={APP_ASSETS.tabProfile} emoji="⚙️" />
             ),
           }}
         />
@@ -137,10 +148,8 @@ export default function TabLayout() {
 
       <LevelUpModal
         visible={showLevelUp}
+        level={currentLevel}
         onClose={() => setShowLevelUp(false)}
-        currentLevel={levelJump?.from ?? null}
-        newLevel={levelJump?.to ?? null}
-        totalXp={character?.totalXp ?? 0}
       />
     </>
   );

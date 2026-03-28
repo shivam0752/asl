@@ -4,9 +4,9 @@ export const XP_WEIGHTS = {
   promotion: 500,
   certification: 150,
   new_skill: 30,
-  workout_session: 50,
-  streak_7day: 200,
-  steps_goal: 20,
+  workout_session: 100, // INCREASED per discussion
+  streak_7day: 250,      // INCREASED for high-tier consistency
+  steps_goal: 100,      // INCREASED to match high-value fitness
   new_connection: 15,
   career_switch: 300,
 } as const;
@@ -15,7 +15,6 @@ export type XPEventKey = keyof typeof XP_WEIGHTS;
 
 /**
  * Calculates the specific amount of XP needed to go from (level) to (level + 1).
- * Modified to start at 250 and scale easier for the first 50 levels.
  */
 function xpRequiredForNextLevel(level: number): number {
   const safeLevel = Math.max(1, Math.floor(level));
@@ -27,12 +26,10 @@ function xpRequiredForNextLevel(level: number): number {
   let required: number;
 
   if (safeLevel <= 50) {
-    // Easier progression for first 50 levels: Linear growth
-    // Level 1: 250, Level 2: 350, Level 3: 450... Level 50: 5150
+    // Linear growth for the main journey
     required = baseXP + (previousLevels * 100);
   } else {
-    // Standard RPG scaling for high levels (Level 51+)
-    // Continues from the Level 50 cap with added polynomial complexity
+    // Hypothetical scaling for internal calculations beyond 50
     const highLevelOffset = safeLevel - 50;
     const level50Cap = baseXP + (49 * 100); // 5150
     required = level50Cap + (highLevelOffset * 150) + (5 * Math.pow(highLevelOffset, 1.5));
@@ -47,31 +44,49 @@ function xpRequiredForNextLevel(level: number): number {
 export function calculateLevelThreshold(level: number): number {
   const safeLevel = Math.max(1, Math.floor(level));
   let total = 0;
-  // Sum up all XP requirements for every level transition up to the target level
   for (let l = 1; l < safeLevel; l++) {
     total += xpRequiredForNextLevel(l);
   }
   return total;
 }
 
+/**
+ * Calculates the current Level, Hard-Capped at 50 for the ALS Evolution.
+ */
 export function calculateLevel(totalXp: number): number {
   let level = 1;
-  // Keep increasing level until the total XP is less than the threshold for the next level
   while (totalXp >= calculateLevelThreshold(level + 1)) {
     level++;
-    if (level >= 999) break;
+    // HARD CAP AT 50
+    if (level >= 50) return 50;
   }
   return level;
 }
 
+/**
+ * Returns the amount of XP earned beyond the Level 50 cap.
+ */
+export function calculatePrestigeXP(totalXp: number): number {
+  const capThreshold = calculateLevelThreshold(50);
+  return Math.max(0, totalXp - capThreshold);
+}
+
 export function xpToNextLevel(totalXp: number): number {
   const currentLevel = calculateLevel(totalXp);
+  
+  // If at cap, there is no "next level" threshold to hit
+  if (currentLevel >= 50) return 0;
+
   const nextThreshold = calculateLevelThreshold(currentLevel + 1);
   return Math.max(0, nextThreshold - totalXp);
 }
 
 export function xpProgressPercent(totalXp: number): number {
   const currentLevel = calculateLevel(totalXp);
+  
+  // If maxed, bar is always full
+  if (currentLevel >= 50) return 100;
+
   const currentThreshold = calculateLevelThreshold(currentLevel);
   const nextThreshold = calculateLevelThreshold(currentLevel + 1);
   

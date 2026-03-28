@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,10 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  SafeAreaView,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -15,21 +19,40 @@ import { calculateTotalStat } from '../../utils/statAlgorithm';
 import { xpProgressPercent, xpToNextLevel } from '../../utils/xpEngine';
 import { getClassName } from '../../constants/classes';
 import { StatName } from '../../types';
+import StatBar from '../../components/ui/StatBar'; // Using our newly animated StatBar
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const STAT_ORDER: StatName[] = ['STR', 'INT', 'WIS', 'VIT', 'CHA', 'AGI'];
 
-export default function Character() {
-  const router                              = useRouter();
-  const { user }                            = useAuth();
-  const { character, stats, loading, refetch } = useCharacter(user?.id);
-  const [selectedStat, setSelectedStat]     = useState<StatName | null>(null);
+const STAT_DESCRIPTIONS: Record<StatName, string> = {
+  STR: 'Physical strength and workout consistency derived from Google Fit.',
+  INT: 'Knowledge depth and learning velocity based on LinkedIn certifications.',
+  WIS: 'Experience and professional seniority levels.',
+  VIT: 'Health, recovery, and overall physical wellbeing.',
+  CHA: 'Network strength and social influence within your industry.',
+  AGI: 'Adaptability and career momentum speed.',
+};
 
-  // Refetch when screen comes into focus
+export default function Character() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const { character, stats, loading, refetch } = useCharacter(user?.id);
+  const [selectedStat, setSelectedStat] = useState<StatName | null>(null);
+
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [])
+    }, [refetch])
   );
+
+  const handleStatPress = (statName: StatName) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedStat(selectedStat === statName ? null : statName);
+  };
 
   if (loading) {
     return (
@@ -42,334 +65,280 @@ export default function Character() {
   if (!character) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.noCharText}>No character found</Text>
+        <Text style={styles.noCharText}>NEURAL LINK SEVERED: NO CHARACTER FOUND</Text>
       </View>
     );
   }
 
   const className = getClassName(character.class, character.tier);
-  const percent   = xpProgressPercent(character.totalXp);
-  const toNext    = xpToNextLevel(character.totalXp);
+  const percent = xpProgressPercent(character.totalXp);
+  const toNext = xpToNextLevel(character.totalXp);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.pageTitle}>CHARACTER</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.pageTitle}>CHARACTER PROFILE</Text>
 
-      {/* Character Card */}
-      <View style={styles.card}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarEmoji}>⚔️</Text>
-        </View>
-
-        <Text style={styles.className}>{className}</Text>
-
-        <View style={styles.badgeRow}>
-          <View style={styles.tierBadge}>
-            <Text style={styles.tierText}>{character.tier} Tier</Text>
+        {/* HERO SECTION */}
+        <View style={styles.heroSection}>
+          <View style={styles.avatarContainer}>
+            <Text style={styles.avatarEmoji}>⚔️</Text>
+            <View style={styles.tierTag}>
+              <Text style={styles.tierTagText}>{character.tier.toUpperCase()}</Text>
+            </View>
           </View>
-          <Text style={styles.level}>LVL {character.level}</Text>
-        </View>
 
-        {/* XP Bar */}
-        <View style={styles.xpContainer}>
-          <View style={styles.xpLabels}>
-            <Text style={styles.xpLabel}>LVL {character.level}</Text>
-            <Text style={styles.xpValue}>
-              {toNext} XP to next level
-            </Text>
-          </View>
-          <View style={styles.xpBarBg}>
-            <View style={[styles.xpBarFill, { width: `${percent}%` }]} />
+          <Text style={styles.className}>{className}</Text>
+          <Text style={styles.levelText}>LEVEL {character.level}</Text>
+
+          {/* XP PROGRESS */}
+          <View style={styles.xpWrapper}>
+            <View style={styles.xpHeader}>
+              <Text style={styles.xpLabel}>PROGRESSION</Text>
+              <Text style={styles.xpValue}>{toNext} XP TO ASCEND</Text>
+            </View>
+            <View style={styles.xpBarBg}>
+              <View style={[styles.xpBarFill, { width: `${percent}%` }]} />
+            </View>
           </View>
         </View>
 
-        <View style={styles.divider} />
+        {/* STATS CONSOLE */}
+        <View style={styles.consoleHeader}>
+          <Text style={styles.consoleTitle}>STATISTICS CONSOLE</Text>
+          <Text style={styles.consoleSubtitle}>TAP STAT FOR NEURAL DATA</Text>
+        </View>
 
-        {/* Stats */}
-        <View style={styles.statsContainer}>
+        <View style={styles.statsList}>
           {STAT_ORDER.map((statName) => {
-            const stat       = stats.find((s) => s.statName === statName);
-            const value      = stat
-              ? calculateTotalStat(stat.baseScore, stat.activeScore)
-              : 0;
-            const color      = STAT_COLORS[statName];
+            const stat = stats.find((s) => s.statName === statName);
+            const value = stat ? calculateTotalStat(stat.baseScore, stat.activeScore) : 0;
             const isSelected = selectedStat === statName;
 
             return (
-              <TouchableOpacity
-                key={statName}
-                style={[
-                  styles.statRow,
-                  isSelected && { backgroundColor: color + '11' },
-                ]}
-                onPress={() => setSelectedStat(isSelected ? null : statName)}
-              >
-                <Text style={[styles.statLabel, { color }]}>{statName}</Text>
-                <View style={styles.statBarBg}>
-                  <View
-                    style={[
-                      styles.statBarFill,
-                      { width: `${value}%`, backgroundColor: color },
-                    ]}
+              <View key={statName}>
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => handleStatPress(statName)}
+                >
+                  <StatBar 
+                    statName={statName} 
+                    value={value} 
+                    showValue={true} 
                   />
-                </View>
-                <Text style={styles.statValue}>{value}</Text>
-              </TouchableOpacity>
+                </TouchableOpacity>
+
+                {isSelected && (
+                  <View style={[styles.detailBox, { borderLeftColor: STAT_COLORS[statName] }]}>
+                    <Text style={styles.detailDesc}>{STAT_DESCRIPTIONS[statName]}</Text>
+                    <View style={styles.dataPoint}>
+                      <Text style={styles.dataLabel}>SOURCE:</Text>
+                      <Text style={styles.dataValue}>
+                        {['STR', 'VIT', 'AGI'].includes(statName) ? 'GOOGLE FIT' : 'LINKEDIN'}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
             );
           })}
         </View>
 
-        {/* Inline stat detail */}
-        {selectedStat && (
-          <View style={[styles.statDetail, { borderColor: STAT_COLORS[selectedStat] }]}>
-            <Text style={[styles.statDetailName, { color: STAT_COLORS[selectedStat] }]}>
-              {selectedStat}
-            </Text>
-            <Text style={styles.statDetailDesc}>
-              {STAT_DESCRIPTIONS[selectedStat]}
-            </Text>
-            <Text style={styles.statDetailTip}>
-              💡 {STAT_TIPS[selectedStat]}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Buttons */}
-      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={styles.outlineButton}
+          style={styles.logButton}
           onPress={() => router.push('/xp-log')}
         >
-          <Text style={styles.outlineButtonText}>View XP Log</Text>
+          <Text style={styles.logButtonText}>ACCESS EXPERIENCE LOGS</Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const STAT_DESCRIPTIONS: Record<StatName, string> = {
-  STR: 'Physical strength and workout consistency.',
-  INT: 'Knowledge depth and learning velocity.',
-  WIS: 'Experience and accumulated knowledge.',
-  VIT: 'Health, energy and physical wellbeing.',
-  CHA: 'Network strength and professional influence.',
-  AGI: 'Adaptability and career momentum.',
-};
-
-const STAT_TIPS: Record<StatName, string> = {
-  STR: 'Log 3+ workouts this week to boost STR.',
-  INT: 'Add a new certification to boost INT by up to +8.',
-  WIS: 'Gain experience in a new industry to increase WIS.',
-  VIT: 'Hit your daily step goal 5 days in a row.',
-  CHA: 'Ask a colleague for a LinkedIn recommendation.',
-  AGI: 'Start a 7-day cardio streak to raise AGI.',
-};
-
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+  },
   container: {
-    flex:            1,
-    backgroundColor: COLORS.background,
+    flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        60,
-    paddingBottom:     40,
+    padding: SPACING.lg,
+    paddingTop: Platform.OS === 'android' ? 20 : 10,
+    paddingBottom: 40,
   },
   loadingContainer: {
-    flex:            1,
-    backgroundColor: COLORS.background,
-    alignItems:      'center',
-    justifyContent:  'center',
+    flex: 1,
+    backgroundColor: '#0D0D0D',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   noCharText: {
-    fontFamily: FONTS.body,
-    color:      COLORS.textSecondary,
-    fontSize:   15,
+    fontFamily: FONTS.heading,
+    color: COLORS.gold,
+    textAlign: 'center',
   },
   pageTitle: {
-    fontFamily:    FONTS.heading,
-    fontSize:      28,
-    color:         COLORS.gold,
+    fontFamily: FONTS.heading,
+    fontSize: 14,
+    color: COLORS.gold,
     letterSpacing: 4,
-    textAlign:     'center',
-    marginBottom:  SPACING.xl,
+    textAlign: 'center',
+    marginBottom: 30,
+    opacity: 0.6,
   },
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius:    BORDER_RADIUS.lg,
-    borderWidth:     2,
-    borderColor:     COLORS.gold,
-    padding:         SPACING.xl,
-    alignItems:      'center',
-    shadowColor:     COLORS.gold,
-    shadowOffset:    { width: 0, height: 0 },
-    shadowOpacity:   0.2,
-    shadowRadius:    20,
-    elevation:       8,
-    marginBottom:    SPACING.lg,
+  heroSection: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 24,
+    padding: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    marginBottom: 30,
   },
-  avatar: {
-    width:           80,
-    height:          80,
-    borderRadius:    40,
-    backgroundColor: COLORS.background,
-    borderWidth:     2,
-    borderColor:     COLORS.gold,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    SPACING.md,
+  avatarContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderWidth: 2,
+    borderColor: COLORS.gold,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    position: 'relative',
   },
   avatarEmoji: {
-    fontSize: 36,
+    fontSize: 40,
+  },
+  tierTag: {
+    position: 'absolute',
+    bottom: -10,
+    backgroundColor: COLORS.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  tierTagText: {
+    fontFamily: FONTS.heading,
+    fontSize: 10,
+    color: '#000',
   },
   className: {
-    fontFamily:    FONTS.heading,
-    fontSize:      34,
-    color:         COLORS.gold,
-    letterSpacing: 2,
-    textAlign:     'center',
-  },
-  badgeRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    gap:            SPACING.sm,
-    marginTop:      SPACING.sm,
-    marginBottom:   SPACING.md,
-  },
-  tierBadge: {
-    borderWidth:       1,
-    borderColor:       COLORS.gold,
-    borderRadius:      BORDER_RADIUS.full,
-    paddingHorizontal: SPACING.md,
-    paddingVertical:   3,
-  },
-  tierText: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.gold,
-  },
-  level: {
     fontFamily: FONTS.heading,
-    fontSize:   20,
-    color:      COLORS.textPrimary,
+    fontSize: 32,
+    color: '#FFF',
+    letterSpacing: 2,
+    textAlign: 'center',
   },
-  xpContainer: {
-    width:        '100%',
-    marginBottom: SPACING.md,
+  levelText: {
+    fontFamily: FONTS.heading,
+    fontSize: 18,
+    color: COLORS.gold,
+    marginTop: 5,
+    letterSpacing: 2,
   },
-  xpLabels: {
-    flexDirection:  'row',
+  xpWrapper: {
+    width: '100%',
+    marginTop: 25,
+  },
+  xpHeader: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom:   6,
+    marginBottom: 8,
   },
   xpLabel: {
-    fontFamily: FONTS.heading,
-    fontSize:   14,
-    color:      COLORS.gold,
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: 'rgba(255,255,255,0.4)',
+    letterSpacing: 1,
   },
   xpValue: {
-    fontFamily: FONTS.body,
-    fontSize:   12,
-    color:      COLORS.textSecondary,
+    fontFamily: FONTS.bodyBold,
+    fontSize: 10,
+    color: COLORS.gold,
   },
   xpBarBg: {
-    height:          10,
-    backgroundColor: COLORS.background,
-    borderRadius:    BORDER_RADIUS.full,
-    overflow:        'hidden',
-    borderWidth:     1,
-    borderColor:     COLORS.gold + '44',
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
   xpBarFill: {
-    height:       '100%',
+    height: '100%',
     backgroundColor: COLORS.gold,
-    borderRadius: BORDER_RADIUS.full,
   },
-  divider: {
-    width:           '100%',
-    height:          1,
-    backgroundColor: COLORS.border,
-    marginBottom:    SPACING.md,
+  consoleHeader: {
+    marginBottom: 20,
+    paddingHorizontal: 5,
   },
-  statsContainer: {
-    width: '100%',
-    gap:   SPACING.sm,
-  },
-  statRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           SPACING.sm,
-    padding:       SPACING.sm,
-    borderRadius:  BORDER_RADIUS.sm,
-  },
-  statLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   12,
-    width:      32,
-  },
-  statBarBg: {
-    flex:            1,
-    height:          8,
-    backgroundColor: COLORS.background,
-    borderRadius:    BORDER_RADIUS.full,
-    overflow:        'hidden',
-  },
-  statBarFill: {
-    height:       '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  statValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize:   12,
-    color:      COLORS.textPrimary,
-    width:      28,
-    textAlign:  'right',
-  },
-  statDetail: {
-    width:           '100%',
-    marginTop:       SPACING.md,
-    padding:         SPACING.md,
-    borderRadius:    BORDER_RADIUS.md,
-    borderWidth:     1,
-    backgroundColor: COLORS.background,
-    gap:             SPACING.sm,
-  },
-  statDetailName: {
-    fontFamily:    FONTS.heading,
-    fontSize:      18,
+  consoleTitle: {
+    fontFamily: FONTS.heading,
+    fontSize: 16,
+    color: '#FFF',
     letterSpacing: 2,
   },
-  statDetailDesc: {
-    fontFamily:  FONTS.body,
-    fontSize:    13,
-    color:       COLORS.textSecondary,
-    lineHeight:  20,
-  },
-  statDetailTip: {
+  consoleSubtitle: {
     fontFamily: FONTS.body,
-    fontSize:   13,
-    color:      COLORS.gold,
+    fontSize: 10,
+    color: COLORS.gold,
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+  statsList: {
+    gap: 4,
+    marginBottom: 30,
+  },
+  detailBox: {
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    padding: 15,
+    marginHorizontal: 10,
+    borderLeftWidth: 2,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 12,
+    borderTopRightRadius: 0,
+    marginBottom: 15,
+    marginTop: -5, // Connect to the bar above
+  },
+  detailDesc: {
+    fontFamily: FONTS.body,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
     lineHeight: 20,
   },
-  buttonRow: {
-    gap: SPACING.md,
+  dataPoint: {
+    flexDirection: 'row',
+    marginTop: 10,
+    gap: 8,
   },
-  outlineButton: {
-    height:         48,
-    borderRadius:   BORDER_RADIUS.md,
-    alignItems:     'center',
-    justifyContent: 'center',
-    borderWidth:    1,
-    borderColor:    COLORS.gold,
-  },
-  outlineButtonText: {
+  dataLabel: {
     fontFamily: FONTS.bodyBold,
-    fontSize:   14,
-    color:      COLORS.gold,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.3)',
+  },
+  dataValue: {
+    fontFamily: FONTS.bodyBold,
+    fontSize: 11,
+    color: COLORS.gold,
+  },
+  logButton: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 16,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  logButtonText: {
+    fontFamily: FONTS.heading,
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    letterSpacing: 2,
   },
 });

@@ -1,291 +1,163 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../hooks/useAuth';
 import { useCharacter } from '../../hooks/useCharacter';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS, STAT_COLORS } from '../../constants/theme';
+import { COLORS, FONTS, SPACING, STAT_COLORS } from '../../constants/theme';
 import { calculateTotalStat } from '../../utils/statAlgorithm';
+import { calculatePrestigeXP } from '../../utils/xpEngine';
 import { StatName } from '../../types';
+import StatRadar from '../../components/ui/StatRadar';
 
 const STAT_ORDER: StatName[] = ['STR', 'INT', 'WIS', 'VIT', 'CHA', 'AGI'];
-type Period = '7D' | '30D' | '90D';
 
 export default function Progress() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { character, stats, loading } = useCharacter(user?.id);
-  const [period, setPeriod] = useState<Period>('30D');
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator color={COLORS.gold} size="large" />
-      </View>
-    );
-  }
+  if (loading) return (
+    <View style={styles.loadingContainer}><ActivityIndicator color={COLORS.gold} size="large" /></View>
+  );
 
-  if (!character) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.emptyText}>No data yet</Text>
-      </View>
-    );
-  }
+  if (!character) return (
+    <View style={styles.loadingContainer}><Text style={styles.emptyText}>SYNC DATA TO ACTIVATE HUD</Text></View>
+  );
 
-  const careerXp  = character.careerXp;
-  const fitnessXp = character.fitnessXp;
-  const totalXp   = character.totalXp;
-  const maxXP     = Math.max(careerXp, fitnessXp, 1);
+  // ALS Prestige Logic
+  const prestigeXP = calculatePrestigeXP(character.totalXp);
+  const isMaxLevel = character.level >= 50;
+
+  const radarData = STAT_ORDER.map(statName => {
+    const stat = stats.find(s => s.statName === statName);
+    return {
+      name: statName,
+      value: stat ? calculateTotalStat(stat.baseScore, stat.activeScore) : 0
+    };
+  });
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={styles.pageTitle}>PROGRESS</Text>
+    <View style={styles.mainWrapper}>
+      <ScrollView 
+        style={styles.container} 
+        contentContainerStyle={[
+          styles.contentContainer, 
+          { paddingTop: insets.top + 20 } // Hardware notch clearance
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.pageTitle}>NEURAL MAP</Text>
 
-      {/* Period selector */}
-      <View style={styles.periodRow}>
-        {(['7D', '30D', '90D'] as Period[]).map((p) => (
-          <TouchableOpacity
-            key={p}
-            style={[styles.periodBtn, period === p && styles.periodBtnActive]}
-            onPress={() => setPeriod(p)}
-          >
-            <Text
-              style={[
-                styles.periodBtnText,
-                period === p && styles.periodBtnTextActive,
-              ]}
-            >
-              {p}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Stat growth tiles */}
-      <Text style={styles.sectionTitle}>STAT GROWTH</Text>
-      <View style={styles.statGrid}>
-        {STAT_ORDER.map((statName) => {
-          const stat  = stats.find((s) => s.statName === statName);
-          const value = stat ? calculateTotalStat(stat.baseScore, stat.activeScore) : 0;
-          const color = STAT_COLORS[statName];
-
-          return (
-            <View key={statName} style={[styles.statTile, { borderTopColor: color }]}>
-              <Text style={styles.statTileName}>{statName}</Text>
-              <Text style={[styles.statTileValue, { color }]}>{value}</Text>
-              <Text style={styles.statTileChange}>+0 this period</Text>
+        {/* SYSTEM OVERLOAD / PRESTIGE HUD */}
+        {isMaxLevel && (
+          <View style={styles.prestigeCard}>
+            <View style={styles.prestigeHeader}>
+              <Text style={styles.prestigeTag}>[ STATUS: SYSTEM OVERLOAD ]</Text>
+              <View style={styles.goldPulse} />
             </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* XP History */}
-      <Text style={styles.sectionTitle}>XP BREAKDOWN</Text>
-
-      <View style={styles.xpBreakdown}>
-        {/* Career XP */}
-        <View style={styles.xpRow}>
-          <Text style={styles.xpRowLabel}>Career XP</Text>
-          <View style={styles.xpRowBarBg}>
-            <View
-              style={[
-                styles.xpRowBarFill,
-                {
-                  width: `${(careerXp / maxXP) * 100}%`,
-                  backgroundColor: COLORS.gold,
-                },
-              ]}
-            />
+            <Text style={styles.prestigeValue}>+{prestigeXP.toLocaleString()} PRESTIGE XP</Text>
+            <Text style={styles.prestigeNote}>MAX LEVEL REACHED. ACCUMULATING AETHER DATA.</Text>
           </View>
-          <Text style={styles.xpRowValue}>{careerXp}</Text>
+        )}
+
+        {/* RADAR HUD SECTION */}
+        <View style={styles.radarCard}>
+          <Text style={styles.radarTitle}>CHARACTER POTENTIAL</Text>
+          <StatRadar data={radarData} />
         </View>
 
-        {/* Fitness XP */}
-        <View style={styles.xpRow}>
-          <Text style={styles.xpRowLabel}>Fitness XP</Text>
-          <View style={styles.xpRowBarBg}>
-            <View
-              style={[
-                styles.xpRowBarFill,
-                {
-                  width: `${(fitnessXp / maxXP) * 100}%`,
-                  backgroundColor: COLORS.success,
-                },
-              ]}
-            />
+        {/* STAT GRID */}
+        <View style={styles.statGrid}>
+          {radarData.map((item) => (
+            <View key={item.name} style={styles.statTile}>
+              <View style={[styles.statDot, { backgroundColor: STAT_COLORS[item.name as StatName] }]} />
+              <Text style={styles.statTileName}>{item.name}</Text>
+              <Text style={[styles.statTileValue, { color: STAT_COLORS[item.name as StatName] }]}>
+                {item.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* PATH DOMINANCE */}
+        <View style={styles.pathCard}>
+          <Text style={styles.sectionHeader}>PATH DOMINANCE</Text>
+          <View style={styles.xpRow}>
+            <Text style={styles.pathLabel}>CAREER STREAM</Text>
+            <Text style={styles.pathValue}>{character.careerXp.toLocaleString()} XP</Text>
           </View>
-          <Text style={styles.xpRowValue}>{fitnessXp}</Text>
+          <View style={styles.xpRow}>
+            <Text style={styles.pathLabel}>FITNESS STREAM</Text>
+            <Text style={styles.pathValue}>{character.fitnessXp.toLocaleString()} XP</Text>
+          </View>
         </View>
-
-        {/* Total */}
-        <View style={styles.totalXpRow}>
-          <Text style={styles.totalXpLabel}>Total XP</Text>
-          <Text style={styles.totalXpValue}>{totalXp}</Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+  mainWrapper: { flex: 1, backgroundColor: '#0D0D0D' },
+  container: { flex: 1 },
+  contentContainer: { padding: SPACING.lg, paddingBottom: 100 },
+  loadingContainer: { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
+  pageTitle: { 
+    fontFamily: FONTS.heading, 
+    fontSize: 14, 
+    color: COLORS.gold, 
+    letterSpacing: 4, 
+    textAlign: 'center', 
+    marginBottom: 20,
+    includeFontPadding: false 
   },
-  contentContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontFamily: FONTS.body,
-    color: COLORS.textSecondary,
-    fontSize: 15,
-  },
-  pageTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 28,
-    color: COLORS.gold,
-    letterSpacing: 4,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-  },
-  periodRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xl,
-    justifyContent: 'center',
-  },
-  periodBtn: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: COLORS.surface,
+  prestigeCard: {
+    backgroundColor: 'rgba(245,197,66,0.05)',
+    borderRadius: 20,
+    padding: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(245,197,66,0.3)',
+    marginBottom: 20,
+    alignItems: 'center'
   },
-  periodBtnActive: {
-    backgroundColor: COLORS.gold,
-    borderColor: COLORS.gold,
+  prestigeHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  prestigeTag: { fontFamily: FONTS.heading, fontSize: 10, color: COLORS.gold, letterSpacing: 2 },
+  goldPulse: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
+  prestigeValue: { fontFamily: FONTS.heading, fontSize: 24, color: '#FFF', letterSpacing: 1 },
+  prestigeNote: { fontFamily: FONTS.bodyBold, fontSize: 9, color: 'rgba(255,255,255,0.4)', marginTop: 8, letterSpacing: 1 },
+  radarCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 24,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    marginBottom: 20
   },
-  periodBtnText: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-  periodBtnTextActive: {
-    color: '#000000',
-  },
-  sectionTitle: {
-    fontFamily: FONTS.heading,
-    fontSize: 18,
-    color: COLORS.textPrimary,
-    letterSpacing: 2,
-    marginBottom: SPACING.md,
-  },
-  statGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
-  },
+  radarTitle: { fontFamily: FONTS.heading, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: 2, marginBottom: 10 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
   statTile: {
-    width: '30%',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    borderTopWidth: 3,
-    gap: 4,
-  },
-  statTileName: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  statTileValue: {
-    fontFamily: FONTS.heading,
-    fontSize: 28,
-  },
-  statTileChange: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: COLORS.success,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginBottom: SPACING.lg,
-  },
-  xpBreakdown: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.xl,
-    gap: SPACING.lg,
-  },
-  xpRow: {
-    flexDirection: 'row',
+    width: '31%',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderRadius: 12,
+    padding: 12,
     alignItems: 'center',
-    gap: SPACING.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)'
   },
-  xpRowLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    width: 80,
-  },
-  xpRowBarBg: {
-    flex: 1,
-    height: 10,
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-  },
-  xpRowBarFill: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-    minWidth: 4,
-  },
-  xpRowValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 13,
-    color: COLORS.textPrimary,
-    width: 40,
-    textAlign: 'right',
-  },
-  totalXpRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingTop: SPACING.md,
-  },
-  totalXpLabel: {
-    fontFamily: FONTS.heading,
-    fontSize: 18,
-    color: COLORS.textPrimary,
-    letterSpacing: 1,
-  },
-  totalXpValue: {
-    fontFamily: FONTS.heading,
-    fontSize: 24,
-    color: COLORS.gold,
-  },
+  statDot: { width: 4, height: 4, borderRadius: 2, marginBottom: 6 },
+  statTileName: { fontFamily: FONTS.body, fontSize: 10, color: 'rgba(255,255,255,0.3)' },
+  statTileValue: { fontFamily: FONTS.heading, fontSize: 20, paddingHorizontal: 4, includeFontPadding: false },
+  pathCard: { backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  sectionHeader: { fontFamily: FONTS.heading, fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 15, letterSpacing: 2 },
+  xpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  pathLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: 1 },
+  pathValue: { fontFamily: FONTS.heading, fontSize: 14, color: '#FFF' },
+  emptyText: { fontFamily: FONTS.heading, color: COLORS.gold, fontSize: 12 }
 });

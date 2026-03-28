@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Dimensions,
   ScrollView,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
@@ -15,10 +16,9 @@ import { useCharacter } from '../../hooks/useCharacter';
 import { getClassName, getClassDescription } from '../../constants/classes';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, STAT_COLORS } from '../../constants/theme';
 import { calculateTotalStat } from '../../utils/statAlgorithm';
-import { StatName } from '../../types';
+import { StatName, ClassArchetype, Tier } from '../../types';
 
 const { width, height } = Dimensions.get('window');
-
 const STAT_ORDER: StatName[] = ['STR', 'INT', 'WIS', 'VIT', 'CHA', 'AGI'];
 
 export default function ClassReveal() {
@@ -26,21 +26,36 @@ export default function ClassReveal() {
   const { user } = useAuth();
   const { character, stats, loading } = useCharacter(user?.id);
 
-  const scaleAnim   = useRef(new Animated.Value(0.5)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  // Animation Controllers
+  const cardScale = useRef(new Animated.Value(0.5)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const textOpacity = useRef(new Animated.Value(0)).current;
+  const burstAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!loading && character) {
-      Animated.parallel([
-        Animated.spring(scaleAnim, {
+      Animated.sequence([
+        Animated.timing(burstAnim, {
           toValue: 1,
-          friction: 6,
-          tension: 80,
+          duration: 800,
           useNativeDriver: true,
         }),
-        Animated.timing(opacityAnim, {
+        Animated.parallel([
+          Animated.spring(cardScale, {
+            toValue: 1,
+            friction: 5,
+            tension: 40,
+            useNativeDriver: true,
+          }),
+          Animated.timing(cardOpacity, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.timing(textOpacity, {
           toValue: 1,
-          duration: 600,
+          duration: 800,
           useNativeDriver: true,
         }),
       ]).start();
@@ -51,273 +66,133 @@ export default function ClassReveal() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator color={COLORS.gold} size="large" />
-        <Text style={styles.loadingText}>Preparing your character...</Text>
+        <Text style={styles.loadingText}>ANALYZING NEURAL DATA...</Text>
       </View>
     );
   }
 
-  if (!character) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Something went wrong.</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: COLORS.gold, fontFamily: FONTS.body }}>Go back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // --- TYPE FIX START ---
+  // Casting to 'as ClassArchetype' ensures TS knows these are valid keys
+  const characterClass = (character?.class as ClassArchetype) || ('WARRIOR' as ClassArchetype);
+  const characterTier = (character?.tier as Tier) || ('Basic' as Tier);
 
-  const className = getClassName(character.class, character.tier);
-  const classDesc = getClassDescription(character.class);
+  const className = getClassName(characterClass, characterTier);
+  const classDesc = getClassDescription(characterClass);
+  // --- TYPE FIX END ---
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {/* Speed lines */}
-      {[...Array(12)].map((_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.burstLine,
-            { transform: [{ rotate: `${i * 30}deg` }] },
-          ]}
-        />
-      ))}
-
-      {/* Label */}
-      <Text style={styles.topLabel}>YOUR CHARACTER</Text>
-
-      {/* Animated card */}
-      <Animated.View
+    <View style={styles.mainWrapper}>
+      <Animated.View 
         style={[
-          styles.card,
-          {
-            transform: [{ scale: scaleAnim }],
-            opacity: opacityAnim,
-          },
+          styles.burstContainer, 
+          { opacity: burstAnim.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, 0.15, 0] }) }
         ]}
       >
-        {/* Avatar */}
-        <View style={styles.avatar}>
-          <Text style={styles.avatarEmoji}>⚔️</Text>
-        </View>
-
-        {/* Class name */}
-        <Text style={styles.className}>{className}</Text>
-
-        {/* Tier badge */}
-        <View style={styles.tierBadge}>
-          <Text style={styles.tierText}>{character.tier} Tier</Text>
-        </View>
-
-        {/* Level */}
-        <Text style={styles.level}>LVL {character.level}</Text>
-
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          {STAT_ORDER.map((statName) => {
-            const stat = stats.find((s) => s.statName === statName);
-            const value = stat
-              ? calculateTotalStat(stat.baseScore, stat.activeScore)
-              : 0;
-            const color = STAT_COLORS[statName];
-
-            return (
-              <View key={statName} style={styles.statRow}>
-                <Text style={[styles.statLabel, { color }]}>{statName}</Text>
-                <View style={styles.statBarBg}>
-                  <View
-                    style={[
-                      styles.statBarFill,
-                      { width: `${value}%`, backgroundColor: color },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.statValue}>{value}</Text>
-              </View>
-            );
-          })}
-        </View>
+        {[...Array(16)].map((_, i) => (
+          <View key={i} style={[styles.burstLine, { transform: [{ rotate: `${i * 22.5}deg` }] }]} />
+        ))}
       </Animated.View>
 
-      {/* Description */}
-      <Text style={styles.description}>{classDesc}</Text>
+      <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+        <Animated.Text style={[styles.topLabel, { opacity: textOpacity }]}>
+          CHARACTER MANIFESTED
+        </Animated.Text>
 
-      {/* CTA */}
-      <TouchableOpacity
-        style={styles.ctaButton}
-        onPress={() => router.replace('/(tabs)/')}
-      >
-        <Text style={styles.ctaText}>BEGIN YOUR JOURNEY →</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <Animated.View style={[styles.card, { transform: [{ scale: cardScale }], opacity: cardOpacity }]}>
+          <View style={styles.avatarGlow}>
+            <Text style={styles.avatarEmoji}>⚔️</Text>
+          </View>
+
+          <Text style={styles.classNameText}>{className.toUpperCase()}</Text>
+          
+          <View style={styles.tierContainer}>
+            <Text style={styles.tierText}>{characterTier.toUpperCase()} TIER</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.statsGrid}>
+            {STAT_ORDER.map((statName) => {
+              const stat = stats.find((s) => s.statName === statName);
+              const value = stat ? calculateTotalStat(stat.baseScore, stat.activeScore) : 0;
+              const color = STAT_COLORS[statName];
+
+              return (
+                <View key={statName} style={styles.statRow}>
+                  <Text style={[styles.statLabel, { color }]}>{statName}</Text>
+                  <View style={styles.barTrack}>
+                    <View style={[styles.barFill, { width: `${value}%`, backgroundColor: color }]} />
+                  </View>
+                  <Text style={styles.statValue}>{value}</Text>
+                </View>
+              );
+            })}
+          </View>
+        </Animated.View>
+
+        <Animated.View style={{ opacity: textOpacity, alignItems: 'center', width: '100%' }}>
+          <Text style={styles.description}>{classDesc}</Text>
+          <TouchableOpacity 
+            style={styles.ctaButton} 
+            onPress={() => router.replace('/(tabs)/')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.ctaText}>BEGIN YOUR JOURNEY</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  contentContainer: {
-    flexGrow: 1,
-    alignItems: 'center',
-    paddingTop: 60,
-    paddingBottom: 48,
-    paddingHorizontal: SPACING.xl,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-  },
-  loadingText: {
-    fontFamily: FONTS.body,
-    color: COLORS.textSecondary,
-    fontSize: 15,
-  },
-  burstLine: {
-    position: 'absolute',
-    width: 1,
-    height: height,
-    backgroundColor: COLORS.gold,
-    opacity: 0.04,
-    top: 0,
-    left: width / 2,
-  },
-  topLabel: {
-    fontFamily: FONTS.body,
-    fontSize: 11,
-    color: COLORS.textSecondary,
-    letterSpacing: 4,
-    marginBottom: SPACING.lg,
-  },
+  mainWrapper: { flex: 1, backgroundColor: '#0D0D0D' },
+  contentContainer: { alignItems: 'center', paddingTop: 80, paddingBottom: 50, paddingHorizontal: 25 },
+  loadingContainer: { flex: 1, backgroundColor: '#0D0D0D', justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontFamily: FONTS.heading, color: COLORS.gold, letterSpacing: 2, marginTop: 20 },
+  burstContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
+  burstLine: { position: 'absolute', width: 2, height: height * 1.5, backgroundColor: COLORS.gold },
+  topLabel: { fontFamily: FONTS.bodyBold, fontSize: 10, color: COLORS.gold, letterSpacing: 5, marginBottom: 30 },
   card: {
     width: '100%',
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 2,
-    borderColor: COLORS.gold,
-    padding: SPACING.xl,
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-    shadowColor: COLORS.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.background,
-    borderWidth: 2,
-    borderColor: COLORS.gold,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
-    shadowColor: COLORS.gold,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-  },
-  avatarEmoji: {
-    fontSize: 36,
-  },
-  className: {
-    fontFamily: FONTS.heading,
-    fontSize: 36,
-    color: COLORS.gold,
-    letterSpacing: 2,
-    textAlign: 'center',
-  },
-  tierBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: COLORS.gold,
-    borderRadius: BORDER_RADIUS.full,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 4,
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  tierText: {
-    fontFamily: FONTS.body,
-    fontSize: 12,
-    color: COLORS.gold,
-  },
-  level: {
-    fontFamily: FONTS.heading,
-    fontSize: 24,
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.md,
-  },
-  divider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: COLORS.border,
-    marginBottom: SPACING.md,
-  },
-  statsContainer: {
-    width: '100%',
-    gap: SPACING.sm,
-  },
-  statRow: {
-    flexDirection: 'row',
+    padding: 25,
     alignItems: 'center',
-    gap: SPACING.sm,
+    marginBottom: 30,
+    ...Platform.select({
+      android: { elevation: 10 },
+      ios: { shadowColor: COLORS.gold, shadowOpacity: 0.3, shadowRadius: 20 }
+    })
   },
-  statLabel: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    width: 32,
-  },
-  statBarBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-  },
-  statBarFill: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  statValue: {
-    fontFamily: FONTS.bodyBold,
-    fontSize: 12,
-    color: COLORS.textPrimary,
-    width: 28,
-    textAlign: 'right',
-  },
-  description: {
-    fontFamily: FONTS.body,
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: SPACING.xl,
-    paddingHorizontal: SPACING.md,
-  },
-  ctaButton: {
-    backgroundColor: COLORS.gold,
-    height: 56,
-    borderRadius: BORDER_RADIUS.md,
-    alignItems: 'center',
+  avatarGlow: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#000',
+    borderWidth: 2,
+    borderColor: COLORS.gold,
     justifyContent: 'center',
-    width: '100%',
+    alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: COLORS.gold,
+    shadowOpacity: 0.6,
+    shadowRadius: 15,
   },
-  ctaText: {
-    fontFamily: FONTS.heading,
-    fontSize: 20,
-    color: '#000000',
-    letterSpacing: 2,
-  },
+  avatarEmoji: { fontSize: 40 },
+  classNameText: { fontFamily: FONTS.heading, fontSize: 30, color: '#FFF', letterSpacing: 2, textAlign: 'center' },
+  tierContainer: { backgroundColor: COLORS.gold, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6, marginTop: 10 },
+  tierText: { fontFamily: FONTS.heading, fontSize: 11, color: '#000' },
+  divider: { width: '100%', height: 1, backgroundColor: 'rgba(255,255,255,0.1)', marginVertical: 25 },
+  statsGrid: { width: '100%', gap: 10 },
+  statRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  statLabel: { fontFamily: FONTS.bodyBold, fontSize: 11, width: 35 },
+  barTrack: { flex: 1, height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 3 },
+  statValue: { fontFamily: FONTS.bodyBold, fontSize: 11, color: '#FFF', width: 30, textAlign: 'right' },
+  description: { fontFamily: FONTS.body, fontSize: 13, color: 'rgba(255,255,255,0.5)', textAlign: 'center', lineHeight: 20, marginBottom: 40, paddingHorizontal: 10 },
+  ctaButton: { backgroundColor: COLORS.gold, paddingVertical: 18, borderRadius: 12, width: '100%', alignItems: 'center' },
+  ctaText: { fontFamily: FONTS.heading, fontSize: 18, color: '#000', letterSpacing: 2 },
 });
