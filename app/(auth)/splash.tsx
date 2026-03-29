@@ -117,7 +117,7 @@ export default function Splash() {
         />
         
         <Text style={styles.versionFooter}>
-          CORE ENGINE v1.0.4 // SYSTEM STATUS: OPTIMIZED
+          CORE ENGINE v1.0.0
         </Text>
       </View>
     </View>
