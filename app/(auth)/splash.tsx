@@ -95,7 +95,7 @@ export default function Splash() {
 
       {/* 2. TEXT CONTENT LAYER */}
       <Animated.View style={[styles.headerGroup, { transform: [{ translateY: floatAnim }] }]}>
-        <Text style={styles.appName}>ALS</Text>
+        <Text style={styles.appName}> ALS </Text>
         <Text style={styles.fullBrand}>AETHER LEVEL SYSTEM</Text>
         <View style={styles.accentLine} />
         <Text style={styles.tagline}>YOUR REAL LIFE. LEVELED UP.</Text>
@@ -104,14 +104,14 @@ export default function Splash() {
       {/* 3. BUTTONS LAYER */}
       <View style={styles.buttonGroup}>
         <ProtocolButton 
-          label=" GET STARTED " 
+          label="GET STARTED" 
           isPrimary={true} 
           onPress={() => router.push('/(auth)/signup')} 
-          icon="⚡"
+          icon=""
         />
         
         <ProtocolButton 
-          label=" LOG IN " 
+          label="LOG IN" 
           isPrimary={true} 
           onPress={() => router.push('/(auth)/login')} 
         />
@@ -156,14 +156,16 @@ const styles = StyleSheet.create({
     letterSpacing: 12,
     includeFontPadding: false,
     textShadowColor: 'rgba(245, 197, 66, 0.3)',
-    textShadowRadius: 15
+    textShadowRadius: 60,
+    paddingRight: 2, // FIXED: Prevents 'S' from being cut off
   },
   fullBrand: { 
     fontFamily: FONTS.bodyBold, 
     fontSize: 12, 
     color: 'rgba(255,255,255,0.4)', 
     letterSpacing: 4, 
-    marginTop: -8 
+    marginTop: -8,
+    paddingRight: 4, // FIXED: Matches letterSpacing
   },
   accentLine: { 
     width: 40, 
@@ -177,6 +179,7 @@ const styles = StyleSheet.create({
     color: COLORS.gold, 
     letterSpacing: 2,
     textTransform: 'uppercase',
+    paddingRight: 2, // FIXED: Matches letterSpacing
   },
 
   // BUTTON STYLING
@@ -184,9 +187,9 @@ const styles = StyleSheet.create({
     position: 'absolute', 
     bottom: 50, 
     width: '100%', 
-    paddingHorizontal: 40, 
+    paddingHorizontal: 50, 
     gap: 15, 
-    zIndex: 3 
+    zIndex: 5 
   },
   protocolBtnWrapper: {
     width: '100%',
@@ -225,6 +228,7 @@ const styles = StyleSheet.create({
     // THE MOBILE FIX: Forces line-height to give room for the letters
     lineHeight: 22,
     textAlign: 'center',
+    paddingRight: 2, // FIXED: Cleaner than adding spaces to label text
   },
   primaryText: { 
     color: '#000',
@@ -265,5 +269,6 @@ const styles = StyleSheet.create({
     letterSpacing: 3,
     marginTop: 15,
     textAlign: 'center',
+    paddingRight: 3, // FIXED: Matches letterSpacing
   }
 });
